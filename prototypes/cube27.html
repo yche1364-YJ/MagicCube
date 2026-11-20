@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Cube · 27 Rooms Demo</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d0f17;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#eef}
+  canvas{display:block;touch-action:none}
+  #help{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.5);padding:9px 13px;border-radius:8px;font-size:12px;line-height:1.5;max-width:240px}
+  #help b{display:block;font-size:15px;margin-bottom:3px;letter-spacing:.03em}
+  #help i{display:block;font-style:normal;color:#cfd3e6;margin-top:4px}
+  #side{position:fixed;top:10px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  #stat{text-align:right;font-size:11px;line-height:1.5;font-family:ui-monospace,Menlo,monospace;background:rgba(0,0,0,.5);padding:6px 9px;border-radius:8px}
+  #map{display:flex;gap:6px;background:rgba(0,0,0,.5);padding:6px 8px;border-radius:8px}
+  .lay{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;color:#aab;font-family:ui-monospace,Menlo,monospace}
+  .g{display:grid;grid-template-columns:repeat(3,10px);gap:2px}
+  .g span{width:10px;height:10px;border-radius:2px;background:#2a2e3d}
+  .g span.done{background:#f2c14e}.g span.here{background:#5ff0e0;box-shadow:0 0 6px #5ff0e0}.g span.core{outline:1.5px solid #ff7a59}
+  #bar{position:fixed;left:0;right:0;bottom:14px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 10px}.row{display:flex;gap:10px}
+  .b{border:0;border-radius:12px;background:rgba(255,255,255,.16);color:#fff;font-size:15px;font-weight:700;min-width:52px;height:52px;padding:0 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .b:active{background:rgba(255,255,255,.32)}
+  .mode{background:#f2a33a;color:#1a1a1a}.blk{background:#111;border:2px solid #f2a33a}
+  #pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,52px);gap:6px}
+  #toast{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);font-size:30px;font-weight:800;letter-spacing:.04em;text-shadow:0 2px 20px #000;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;width:90%}
+  #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none}
+  #panel{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);width:min(440px,calc(100% - 28px));background:rgba(10,12,20,.85);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:16px 18px;box-sizing:border-box;display:none;text-align:center}
+  #hintb{background:#ff7aa2;color:#2a0a14}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(242,163,58,.45)}}.pulse{animation:pulse 1s infinite}
+  #panel h2{margin:0 0 6px;font-size:20px;color:#ff9c7a}#panel p{margin:0 0 6px;font-size:14px;line-height:1.5;color:#d8dbea}
+  @media (max-width:560px){#help{font-size:11px;max-width:175px;padding:7px 10px}#help b{font-size:13px}.ctl{display:none}}
+</style>
+</head>
+<body>
+<div id="help"></div>
+<div id="side"><div id="stat"></div><div id="map"></div></div>
+<div id="toast"></div>
+<div id="panel"></div>
+<div id="fade"></div>
+<div id="bar"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ================= scene =================
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0d0f17);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);
+ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(ren.domElement);
+const cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.05,300);
+scene.add(new THREE.HemisphereLight(0xffffff,0x303040,.55));
+const sun=new THREE.DirectionalLight(0xffffff,1);sun.position.set(-4,9,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-4,right:4,top:4,bottom:-4,near:1,far:25});scene.add(sun);scene.add(sun.target);
+const std=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:new THREE.Color(c),roughness:.55},o));
+const COL={red:'#d63a32',org:'#e8692c',yel:'#e2b53a',grn:'#3fa34d',blu:'#2f55c8',wht:'#e9e6df'};const PAL=Object.values(COL);
+const $=id=>document.getElementById(id);
+const tween=(dur,fn)=>new Promise(res=>{const t0=performance.now();(function f(){const k=Math.min(1,(performance.now()-t0)/1000/dur);fn(k);k<1?requestAnimationFrame(f):res()})()});
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+const wait=s=>new Promise(r=>setTimeout(r,s*1000));
+
+// ================= surface: the cube =================
+const surface=new THREE.Group();scene.add(surface);
+const GAP=1.02,TOP=1.5*GAP;
+for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),std('#111216',{roughness:.8}));m.position.set(x*GAP,y*GAP,z*GAP);m.castShadow=m.receiveShadow=true;surface.add(m);
+  const st=(nx,ny,nz)=>{const s=new THREE.Mesh(new THREE.BoxGeometry(nx?.02:.88,ny?.02:.88,nz?.02:.88),std(PAL[(x*7+y*5+z*3+nx*2+nz+9)%6]));s.position.set(x*GAP+nx*.51,y*GAP+ny*.51,z*GAP+nz*.51);surface.add(s)};
+  if(x===1)st(1,0,0);if(x===-1)st(-1,0,0);if(z===1)st(0,0,1);if(z===-1)st(0,0,-1);if(y===-1)st(0,-1,0)}
+const DV=[[0,-1],[1,0],[0,1],[-1,0]];// N E S W
+const LEVEL=[
+  [{c:'red',e:[1,2]},       {c:'blu',e:[1,3],r:1},   {c:'yel',e:[2,3],r:2}],
+  [{c:'grn',e:[1,2],r:1},   {c:'wht',e:[0,1,2,3]},   {c:'blu',e:[0,2,3],r:1}],
+  [{c:'yel',e:[1],start:1,r:1},{c:'red',e:[0,3],r:2},{c:'org',e:[0,3],r:1}]];
+const tiles=[];
+function pathMesh(exits){const g=new THREE.Group();const W=.34,H=.05,m=std('#f4f2ec',{emissive:0x222222});
+  const c=new THREE.Mesh(new THREE.BoxGeometry(W,H,W),m);c.position.y=H/2;g.add(c);
+  exits.forEach(d=>{const s=new THREE.Mesh(new THREE.BoxGeometry(d%2?.5-W/2+.01:W,H,d%2?W:.5-W/2+.01),m);const L=(.5+W/2)/2;s.position.set(DV[d][0]*L,H/2,DV[d][1]*L);g.add(s)});
+  g.children.forEach(o=>{o.castShadow=o.receiveShadow=true});return g}
+for(let r=0;r<3;r++)for(let c=0;c<3;c++){const L=LEVEL[r][c];
+  const g=new THREE.Group();g.position.set((c-1)*GAP,TOP,(r-1)*GAP);surface.add(g);
+  const flip=new THREE.Group();g.add(flip);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(.94,.06,.94),std(COL[L.c]));base.position.y=.03;base.receiveShadow=true;flip.add(base);
+  const p=pathMesh(L.e);p.position.y=.06;flip.add(p);
+  const cover=new THREE.Mesh(new THREE.BoxGeometry(.94,.13,.94),std('#050507',{roughness:.9}));cover.material=cover.material.clone();cover.material=cover.material.clone();cover.position.y=.07;cover.visible=false;flip.add(cover);
+  const star=new THREE.Mesh(new THREE.OctahedronGeometry(.08),std('#f2c14e',{emissive:0x7a5a10}));star.position.set(.32,.2,-.32);star.visible=false;g.add(star);
+  const sel=new THREE.Mesh(new THREE.BoxGeometry(.99,.08,.99),new THREE.MeshBasicMaterial({color:0xf2a33a,wireframe:true}));sel.position.y=.04;sel.visible=false;g.add(sel);
+  tiles.push({r,c,g,flip,cover,star,exits:L.e,rot:L.r||0,sel,start:L.start,sw:L.sw,n:r*3+c+1,black:false})}
+const T=(r,c)=>tiles.find(t=>t.r===r&&t.c===c);
+const exitsOf=t=>t.exits.map(d=>(d+t.rot)%4);
+const stT=tiles.find(t=>t.start);
+
+// player
+const player=new THREE.Group();scene.add(player);
+const pm=std('#3b78c9',{roughness:.35});
+const pb=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.24,20),pm);pb.position.y=.24;player.add(pb);
+[.12,.36].forEach(y=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.13,20,14),pm);s.position.y=y;player.add(s)});
+const halo=new THREE.Mesh(new THREE.SphereGeometry(.045,12,8),new THREE.MeshBasicMaterial({color:0x8affc1}));halo.position.y=.6;player.add(halo);
+player.children.forEach(o=>o.castShadow=true);
+
+// ================= world state =================
+let where='surface',mode='explore',busy=false,pr=2,pc=0,room=null;
+const solved=new Set();// "layer,r,c"  layer 0 top / 1 middle / 2 bottom
+function surfacePos(r,c){return new THREE.Vector3((c-1)*GAP,TOP+.11,(r-1)*GAP)}
+// pink hint marker: only shows when asked for, then fades
+const hintM=new THREE.Mesh(new THREE.RingGeometry(.42,.62,4,1),new THREE.MeshBasicMaterial({color:0xff7aa2,transparent:true,opacity:0,side:2,depthTest:false}));
+hintM.rotation.x=-Math.PI/2;hintM.renderOrder=9;scene.add(hintM);let hintUntil=0,lastAct=performance.now();
+function showHint(pos,size,text){hintM.position.copy(pos);hintM.scale.setScalar(size);hintM.rotation.z=Math.PI/4;hintUntil=performance.now()+4000;if(text)toast(text)}
+
+// ================= rooms =================
+const RY=-60,S=1.25;// rooms live far below; S = floor cell size
+const roomG=new THREE.Group();scene.add(roomG);
+function cubeType(L,r,c){const sides=(r!==1)+(c!==1);const faces=sides+(L!==1?1:0);
+  if(L===1&&r===1&&c===1)return{name:'Core',faces:0};return{name:faces===3?'Corner':faces===2?'Edge':'Center',faces}}
+function roomPos(r,c){return new THREE.Vector3((c-1)*S,RY+.12,(r-1)*S)}
+function clearRoom(){roomG.children.slice().forEach(o=>roomG.remove(o));room=null}
+function shell(L,r,c,floorCol,wallCol){
+  const walls=[];const H=2.6,W=3*S;
+  const wall=(nx,nz)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(nx?.12:W+.24,H,nz?.12:W+.24),std(wallCol,{roughness:.9}));
+    m.position.set(nx*(W/2+.06),RY+H/2,nz*(W/2+.06));m.receiveShadow=true;roomG.add(m);m.userData.n=new THREE.Vector3(nx,0,nz);walls.push(m);
+    // window on faces that are outside the big cube
+    const outside=(nz===-1&&r===0)||(nz===1&&r===2)||(nx===-1&&c===0)||(nx===1&&c===2);
+    if(outside){const w=new THREE.Mesh(new THREE.PlaneGeometry(.9,1.1),new THREE.MeshBasicMaterial({color:0x8fd8ff}));
+      const tx=nz?-.8:0,tz=nx?.8:0;w.position.set(nx*(W/2-.005)+tx,RY+1.35,nz*(W/2-.005)+tz);w.lookAt(new THREE.Vector3(tx,RY+1.35,tz));m.userData.win=w;roomG.add(w);
+      const fr=new THREE.Mesh(new THREE.PlaneGeometry(.06,1.1),new THREE.MeshBasicMaterial({color:0x223}));fr.position.copy(w.position).multiplyScalar(1).add(new THREE.Vector3(0,0,0));fr.position.set(w.position.x*.999,w.position.y,w.position.z*.999);fr.lookAt(new THREE.Vector3(tx,RY+1.35,tz));roomG.add(fr);m.userData.fr=fr}
+    return m};
+  wall(0,-1);wall(0,1);wall(-1,0);wall(1,0);
+  const fl=new THREE.Mesh(new THREE.BoxGeometry(W+.24,.2,W+.24),std('#1b1d27'));fl.position.y=RY-.1;fl.receiveShadow=true;roomG.add(fl);
+  const tilesR=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++){const t=new THREE.Mesh(new THREE.BoxGeometry(S*.94,.12,S*.94),std(floorCol));t.position.copy(roomPos(i,j)).setY(RY+.06);t.receiveShadow=true;roomG.add(t);tilesR.push(t)}
+  const lt=new THREE.PointLight(0xfff0d8,.7,9);lt.position.set(0,RY+2.3,0);roomG.add(lt);
+  return{walls,floor:tilesR}}
+function buildRoomA(r,c){// top layer: three lamps, three floor buttons
+  const sh=shell(0,r,c,'#d9c7a8','#e9dcc6');
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,6,16,1,true),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.08,side:2,depthWrite:false}));beam.position.set(0,RY+3,0);roomG.add(beam);
+  const lamps=[0,1,2].map(i=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.17,20,14),std('#555',{emissive:0x000000}));m.position.set(.1+(i-1)*.62,RY+2.0,-1.5*S+.25);roomG.add(m);
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(.05,.05,.25),std('#333'));arm.position.set(.1+(i-1)*.62,RY+2.0,-1.5*S+.12);roomG.add(arm);return m});
+  const BTN=[{r:0,c:0,t:[0,1],col:'#e2b53a'},{r:0,c:2,t:[1,2],col:'#3fa34d'},{r:2,c:1,t:[0,2],col:'#2f55c8'}];
+  BTN.forEach(b=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.08,24),std(b.col,{emissive:0x111111}));p.position.copy(roomPos(b.r,b.c)).setY(RY+.16);roomG.add(p);b.mesh=p;
+    b.t.forEach((li,k)=>{const d=new THREE.Mesh(new THREE.SphereGeometry(.06,10,8),std('#fff'));d.position.copy(p.position).add(new THREE.Vector3((k-.5)*.28+(li-1)*.0,.07,0));roomG.add(d)})});
+  return{kind:'A',L:0,r,c,sh,lamps,on:[false,true,false],BTN,hatch:false,land:[1,1]}}
+function buildRoomB(r,c){// middle layer: draw the shape in one stroke
+  const sh=shell(1,r,c,'#e9e6df','#c9d6e8');
+  const target=new Set(['0,1','0,0','1,0','2,0']);
+  const board=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,.05),std('#f4f2ec'));board.position.set(.75,RY+1.4,-1.5*S+.1);roomG.add(board);
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++){const q=new THREE.Mesh(new THREE.PlaneGeometry(.33,.33),new THREE.MeshBasicMaterial({color:target.has(i+','+j)?0x111111:0xd8d4cb}));
+    q.position.set(.75+(j-1)*.37,RY+1.4+(1-i)*.37,-1.5*S+.13);roomG.add(q)}
+  return{kind:'B',L:1,r,c,sh,target,black:new Set(),land:[1,1]}}
+function buildCore(){
+  const g=new THREE.Group();g.position.y=RY;roomG.add(g);
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(3,3,.2,48),std('#151824'));disc.position.y=-.1;disc.receiveShadow=true;g.add(disc);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(3,.04,8,64),new THREE.MeshBasicMaterial({color:0xff7a59}));ring.rotation.x=Math.PI/2;g.add(ring);
+  const holo=new THREE.Group();holo.position.set(0,2.1,-1.2);g.add(holo);
+  for(let L=0;L<3;L++)for(let r=0;r<3;r++)for(let c=0;c<3;c++){const k=L+','+r+','+c,isCore=k==='1,1,1',done=solved.has(k);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,.3),new THREE.MeshStandardMaterial({color:isCore?0xff7a59:done?0xf2c14e:0x6a7290,emissive:isCore?0x662010:done?0x5a4010:0x000000,transparent:true,opacity:isCore||done?.95:.28}));
+    m.position.set((c-1)*.38,(1-L)*.38,(r-1)*.38);holo.add(m)}
+  const lt=new THREE.PointLight(0xff9c7a,1.4,10);lt.position.set(0,2.4,-1);g.add(lt);
+  return{kind:'core',holo,land:null}}
+
+// ================= surface logic: the traveler walks by himself =================
+function linked(a,b,d){return exitsOf(a).includes(d)&&exitsOf(b).includes((d+2)%4)}
+function routeToHole(){// BFS over connected white paths; a black tile counts if a reached tile's path points at it
+  const key=(r,c)=>r+','+c,prev={},q=[[pr,pc]];prev[key(pr,pc)]=null;
+  while(q.length){const[r,c]=q.shift();const a=T(r,c);
+    for(let d=0;d<4;d++){const nr=r+DV[d][1],nc=c+DV[d][0];if(nr<0||nr>2||nc<0||nc>2||key(nr,nc)in prev)continue;const b=T(nr,nc);
+      if(b.black){if(exitsOf(a).includes(d)){const path=[[nr,nc]];let k=key(r,c);while(k){path.unshift(k.split(',').map(Number));k=prev[k]}return path.slice(1)}continue}
+      if(linked(a,b,d)){prev[key(nr,nc)]=key(r,c);q.push([nr,nc])}}}
+  return null}
+async function walk(path,posFn){for(const[r,c]of path){const from=player.position.clone(),to=posFn(r,c);const d=[0,1,2,3].find(d=>r-pr===DV[d][1]&&c-pc===DV[d][0]);
+    if(d!==undefined)player.rotation.y=Math.atan2(DV[d][0],DV[d][1]);
+    await tween(.3,k=>{player.position.lerpVectors(from,to,k);player.position.y+=Math.sin(k*Math.PI)*.12});pr=r;pc=c}}
+function checkConnected(){if(routeToHole()){toast('Path connected!\nSwitch to Explore and walk in');$('modeb')&&$('modeb').classList.add('pulse')}}
+function routeTo(r,c){const key=(i,j)=>i+','+j,prev={},q=[[pr,pc]];prev[key(pr,pc)]=null;
+  while(q.length){const[i,j]=q.shift();const a=T(i,j);for(let d=0;d<4;d++){const ni=i+DV[d][1],nj=j+DV[d][0];if(ni<0||ni>2||nj<0||nj>2||key(ni,nj)in prev)continue;const b=T(ni,nj);
+    const ok=b.black?exitsOf(a).includes(d):linked(a,b,d);if(!ok)continue;prev[key(ni,nj)]=key(i,j);
+    if(ni===r&&nj===c){const path=[];let k=key(ni,nj);while(k&&k!==key(pr,pc)){path.unshift(k.split(',').map(Number));k=prev[k]}return path}
+    if(!b.black)q.push([ni,nj])}}return null}
+async function walkTo(r,c){if(r===pr&&c===pc)return;const path=routeTo(r,c);act();
+  if(!path){toast("No path there yet\nTry Puzzle mode");return}busy=true;await walk(path,surfacePos);
+  if(T(pr,pc).black){await fallInto(T(pr,pc))}else busy=false}
+function step(d){if(where==='surface'){if(mode!=='explore'||busy)return;const nr=pr+DV[d][1],nc=pc+DV[d][0];if(nr<0||nr>2||nc<0||nc>2)return;walkTo(nr,nc)}
+  else if(where==='room'&&!busy){const nr=pr+DV[d][1],nc=pc+DV[d][0];if(nr>=0&&nr<3&&nc>=0&&nc<3)tapRoomCell(nr,nc)}}
+async function rotateTile(t){if(t.black){toast('Hold it to close the hole');return}t.rot=(t.rot+1)%4;act();await wait(.2);hud();checkConnected()}
+async function flipTile(t){if(t.r===1&&t.c===1){toast("The center tile won't flip");return}
+  if(t.r===pr&&t.c===pc){toast('The traveler is standing on it');return}
+  busy=true;act();const others=tiles.filter(o=>o.black&&o!==t);
+  const fl=(x,on)=>tween(.4,k=>{x.flip.rotation.x=Math.PI*k;if(k>=.5)x.cover.visible=on}).then(()=>{x.flip.rotation.x=0;x.black=on;x.cover.visible=on});
+  await Promise.all([fl(t,!t.black),...others.map(o=>fl(o,false))]);busy=false;hud();checkConnected()}
+function resetSurface(){tiles.forEach(t=>{t.rot=LEVEL[t.r][t.c].r||0;t.black=false;t.cover.visible=false;t.flip.position.y=0});pr=stT.r;pc=stT.c;player.position.copy(surfacePos(pr,pc));hud()}
+
+// ================= room logic: tap where to go =================
+async function tapRoomCell(r,c){if(busy)return;act();
+  if(room.kind==='A'){const isBtn=(i,j)=>room.BTN.some(b=>b.r===i&&b.c===j);
+    if(r===1&&c===1&&!room.hatch&&!(pr===1&&pc===1)){}
+    const key=(i,j)=>i+','+j,prev={},q=[[pr,pc]];prev[key(pr,pc)]=null;let found=false;
+    while(q.length&&!found){const[i,j]=q.shift();for(let d=0;d<4;d++){const ni=i+DV[d][1],nj=j+DV[d][0];if(ni<0||ni>2||nj<0||nj>2||key(ni,nj)in prev)continue;
+      const dest=ni===r&&nj===c;if(!dest&&(isBtn(ni,nj)||(room.hatch&&ni===1&&nj===1)))continue;prev[key(ni,nj)]=key(i,j);if(dest){found=true;break}q.push([ni,nj])}}
+    if(!found)return;const path=[];let k=key(r,c);while(k&&k!==key(pr,pc)){path.unshift(k.split(',').map(Number));k=prev[k]}
+    busy=true;await walk(path,roomPos);busy=false;arrivedRoom()}
+  else if(room.kind==='B'){if(Math.abs(r-pr)+Math.abs(c-pc)!==1){toast('One step at a time');return}
+    if(room.black.has(r+','+c)){toast("Black tiles can't be stepped on");return}
+    busy=true;await walk([[r,c]],roomPos);busy=false;arrivedRoom()}}
+function arrivedRoom(){
+  if(room.kind==='A'){const b=room.BTN.find(b=>b.r===pr&&b.c===pc);
+    if(b&&!room.hatch){b.t.forEach(i=>room.on[i]=!room.on[i]);lampDraw();
+      if(room.on.every(x=>x)){room.hatch=true;solved.add('0,'+room.r+','+room.c);T(room.r,room.c).star.visible=true;toast('ROOM SOLVED\nTap the hole to drop down');openHatch()}}
+    if(room.hatch&&pr===1&&pc===1)fallDown()}
+  else{const k=pr+','+pc;room.black.add(k);room.sh.floor[pr*3+pc].material=std('#111');
+    const ok=room.black.size===room.target.size&&[...room.black].every(x=>room.target.has(x));
+    if(ok){solved.add('1,'+room.r+','+room.c);toast('SHAPE COMPLETE');fallCore()}
+    else if(![0,1,2,3].some(d=>{const ni=pr+DV[d][1],nj=pc+DV[d][0];return ni>=0&&ni<3&&nj>=0&&nj<3&&!room.black.has(ni+','+nj)}))toast('Stuck!\nTap ⟲ to reset the room')}
+  hud()}
+function lampDraw(){room.lamps.forEach((m,i)=>{m.material.color.set(room.on[i]?'#ffe27a':'#555');m.material.emissive.set(room.on[i]?0xffb020:0x000000)})}
+function resetRoom(){if(where!=='room'||busy)return;
+  if(room.kind==='A'){if(room.hatch)return;room.on=[false,true,false];lampDraw()}
+  else{room.black.clear();room.sh.floor.forEach(t=>t.material=std('#e9e6df'))}
+  pr=1;pc=1;player.position.copy(roomPos(1,1));hud()}
+
+// ================= hints (pink) =================
+function hint(){act();
+  if(where==='surface'&&mode==='explore'){const p=routeToHole();if(p){const[r,c]=p[p.length-1];return showHint(T(r,c).g.position.clone().setY(TOP+.2),1,'Tap the hole to walk in')}
+    return toast('No way in yet\nSwitch to Puzzle mode')}
+  if(where==='surface'){const hole=tiles.find(t=>t.black);
+    // 1) a single rotation that opens a route
+    for(const t of tiles){if(t.black)continue;const r0=t.rot;for(let k=1;k<4;k++){t.rot=(r0+k)%4;if(hole&&routeToHole()){t.rot=r0;return showHint(t.g.position.clone().setY(TOP+.2),1,`Tap this tile ${k===1?'once':k+' times'}`)}}t.rot=r0}
+    // 2) a tile that, made into a hole, is reachable now
+    for(const t of tiles){if(t.black||(t.r===1&&t.c===1)||(t.r===pr&&t.c===pc))continue;const was=hole;if(was)was.black=false;t.black=true;const ok=routeToHole();t.black=false;if(was)was.black=true;
+      if(ok)return showHint(t.g.position.clone().setY(TOP+.2),1,'Hold this tile to open a hole')}
+    // 3) otherwise: turn the tile the traveler stands on
+    const me=T(pr,pc);return showHint(me.g.position.clone().setY(TOP+.2),1,'Try turning the tile under the traveler')}
+  if(where==='room'&&room.kind==='A'){// shortest button sequence to light all lamps
+    let best=null;for(let m=1;m<8;m++){const on=room.on.slice();const seq=[];room.BTN.forEach((b,i)=>{if(m>>i&1){b.t.forEach(x=>on[x]=!on[x]);seq.push(b)}});if(on.every(x=>x)&&(!best||seq.length<best.length))best=seq}
+    if(room.hatch)return showHint(roomPos(1,1).setY(RY+.2),S,'Step into the hole');
+    if(best){const b=best.find(b=>!(b.r===pr&&b.c===pc))||best[0];return showHint(roomPos(b.r,b.c).setY(RY+.2),S,b.r===pr&&b.c===pc?'Step off and back on':'Step on this button')}}
+  if(where==='room'&&room.kind==='B'){const order=['0,1','0,0','1,0','2,0'];const done=order.slice(0,room.black.size);
+    if(![...room.black].every((x,i)=>done.includes(x))||(room.black.size&&(pr+','+pc)!==done[done.length-1]))return toast('Off track — tap ⟲ to reset');
+    const[i,j]=order[room.black.size].split(',').map(Number);return showHint(roomPos(i,j).setY(RY+.2),S,'Step here next')}}
+function act(){lastAct=performance.now();hintUntil=0}
+
+// ================= transitions =================
+async function fade(to,dur=.35){const f=$('fade'),a=+f.style.opacity||0;await tween(dur,k=>f.style.opacity=a+(to-a)*k)}
+async function dropPlayer(){const to=roomPos(pr,pc),from=to.clone().setY(to.y+4);player.position.copy(from);
+  await Promise.all([fade(0,.4),tween(.7,k=>player.position.lerpVectors(from,to,k*k))])}
+async function fallInto(t){busy=true;hintUntil=0;
+  const p0=player.position.clone(),f0=t.flip.position.y;
+  await tween(1,k=>{player.position.y=p0.y-k*k*2.2;t.flip.position.y=f0-k*k*2.2;if(k>.6)$('fade').style.opacity=(k-.6)/.4});
+  surface.visible=false;clearRoom();room=buildRoomA(t.r,t.c);lampDraw();where='room';pr=1;pc=1;
+  sun.position.set(-3,RY+9,4);sun.target.position.set(0,RY,0);
+  if(solved.has('0,'+t.r+','+t.c)){room.on=[true,true,true];lampDraw();room.hatch=true;openHatch(true)}
+  camSnap();await dropPlayer();busy=false;act();toast(`TOP LAYER · ${cubeType(0,t.r,t.c).name.toUpperCase()}`);hud()}
+async function openHatch(instant){const tl=room.sh.floor[4];const y0=tl.position.y;if(instant){tl.visible=false;return}await tween(.8,k=>tl.position.y=y0-k*1.5);tl.visible=false}
+async function fallDown(){busy=true;const r=room.r,c=room.c,p0=player.position.clone();
+  await tween(.9,k=>{player.position.y=p0.y-k*k*2.5;if(k>.5)$('fade').style.opacity=(k-.5)/.5});
+  clearRoom();room=buildRoomB(r,c);where='room';pr=1;pc=1;camSnap();await dropPlayer();busy=false;act();
+  toast(`MIDDLE LAYER · ${cubeType(1,r,c).name.toUpperCase()}`);hud()}
+async function fallCore(){busy=true;await wait(.4);
+  const ks=[...room.black];await tween(.8,k=>ks.forEach(s=>{const[i,j]=s.split(',').map(Number);room.sh.floor[i*3+j].position.y=RY+.06-k*1.5}));
+  const p0=player.position.clone();await tween(.9,k=>{player.position.y=p0.y-k*k*2.5;if(k>.5)$('fade').style.opacity=(k-.5)/.5});
+  clearRoom();solved.add('1,1,1');room=buildCore();where='core';
+  player.position.set(0,RY+4,1.2);camSnap();await Promise.all([fade(0,.5),tween(.8,k=>player.position.y=RY+4-k*k*4)]);
+  busy=false;hud();showCorePanel()}
+function showCorePanel(){const n=solved.size,p=$('panel');
+  p.innerHTML=`<h2>You reached the CORE</h2><p>Normal ending ✓</p><p><b>${n} / 27</b> rooms solved.<br>${27-n} rooms are still waiting — the dim cubes in the hologram.</p><p style="color:#9aa">(The true ending is still being designed.)</p>`;
+  const b=document.createElement('button');b.className='b mode';b.textContent='Back to the surface';b.style.marginTop='6px';b.onclick=backToSurface;p.appendChild(b);p.style.display='block'}
+async function backToSurface(){$('panel').style.display='none';busy=true;await fade(1,.4);clearRoom();where='surface';mode='explore';
+  surface.visible=true;resetSurface();sun.position.set(-4,9,5);sun.target.position.set(0,0,0);camSnap();await fade(0,.5);busy=false;act();toast('Open a different hole\nto find another room');hud()}
+
+// ================= camera =================
+let az=-35,el=38;const camLook=new THREE.Vector3();
+function camGoal(){let tgt,d,e=el;
+  if(where==='surface'){if(mode==='puzzle'){tgt=new THREE.Vector3(0,.5,0);d=8.6}else{tgt=player.position.clone().add(new THREE.Vector3(0,.2,0));d=4.6}}
+  else if(where==='room'){tgt=new THREE.Vector3(0,RY+.9,0);d=8.2;e=Math.max(el,42)}
+  else{tgt=new THREE.Vector3(0,RY+2.2,0);d=8.5}
+  d*=Math.max(1,.75/cam.aspect*.75+.25);const a=az*Math.PI/180,er=e*Math.PI/180;
+  return{tgt,pos:tgt.clone().add(new THREE.Vector3(Math.sin(a)*Math.cos(er)*d,Math.sin(er)*d,Math.cos(a)*Math.cos(er)*d))}}
+function camSnap(){const g=camGoal();cam.position.copy(g.pos);camLook.copy(g.tgt);cam.lookAt(camLook)}
+function camUpdate(dt){const g=camGoal();cam.position.lerp(g.pos,Math.min(1,dt*6));camLook.lerp(g.tgt,Math.min(1,dt*6));cam.lookAt(camLook)}
+function screenDir(k){const f=Math.round(((-az)%360+360)%360/90)%4;return(k+f)%4}
+
+// ================= input: tap = rotate / walk, hold = flip =================
+let drag=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function pick(e,objs){const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,cam);return ray.intersectObjects(objs,true)[0]}
+function tileOf(o){while(o&&!tiles.find(t=>t.g===o))o=o.parent;return tiles.find(t=>t.g===o)}
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false,held:false};
+  if(where==='surface'&&mode==='puzzle'&&!busy){const h=pick(e,tiles.map(t=>t.g));if(h){const t=tileOf(h.object);drag.timer=setTimeout(()=>{if(drag&&!drag.moved){drag.held=true;flipTile(t)}},450)}}});
+ren.domElement.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.lx,dy=e.clientY-drag.ly;drag.lx=e.clientX;drag.ly=e.clientY;
+  if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>8){drag.moved=true;clearTimeout(drag.timer)}if(drag.moved){az-=dx*.35;el=Math.max(12,Math.min(80,el+dy*.3))}});
+ren.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d)return;clearTimeout(d.timer);if(d.moved||d.held||busy)return;
+  if(where==='surface'){const h=pick(e,tiles.map(t=>t.g));if(h){const t=tileOf(h.object);mode==='puzzle'?rotateTile(t):walkTo(t.r,t.c)}}
+  else if(where==='room'){const h=pick(e,room.sh.floor);if(h){const i=room.sh.floor.indexOf(h.object);tapRoomCell(Math.floor(i/3),i%3)}}});
+addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();toggleMode();return}const k=e.key.toLowerCase();const sd=i=>(i+Math.round(((-az)%360+360)%360/90)%4)%4;
+  if(k==='w')step(sd(0));if(k==='d')step(sd(1));if(k==='s')step(sd(2));if(k==='a')step(sd(3));if(k==='h')hint();if(e.key.toLowerCase()==='r')where==='room'?resetRoom():resetSurface()});
+
+// ================= HUD =================
+function hud(){let help='',stat='';
+  if(where==='surface'){const bb='style="display:inline;font-size:inherit"';help=mode==='puzzle'?`<b style="color:#f2a33a">PUZZLE MODE</b><i><b ${bb}>Tap</b> a tile to turn it.<br><b ${bb}>Hold</b> a tile to open a hole.</i>`
+    :`<b style="color:#7fe0a8">EXPLORATION MODE</b><i><b ${bb}>Tap</b> a tile to walk there along the white paths.<br>Walk into the black hole to fall into the cube.</i>`;stat='SURFACE · '+mode.toUpperCase()}
+  else if(where==='room'){const ct=cubeType(room.L,room.r,room.c);
+    help=room.kind==='A'?`<b style="color:#ffe27a">TOP LAYER · ${ct.name.toUpperCase()}</b><i>${ct.faces} face${ct.faces>1?'s':''} open to the outside.<br>Tap the floor to walk. Light all three lamps.</i>`
+      :`<b style="color:#9fd0ff">MIDDLE LAYER · ${ct.name.toUpperCase()}</b><i>Tap a tile next to you to step. Stepped tiles turn black and can't be used again.<br>Draw the shape on the wall in one stroke.</i>`;
+    stat=`ROOM R${room.r+1}C${room.c+1} · ${room.kind==='A'?'TOP':'MIDDLE'}`}
+  else{help='<b style="color:#ff9c7a">THE CORE</b><i>The hidden 27th room.</i>';stat='CORE'}
+  $('help').innerHTML=help;$('stat').innerHTML=stat+`<br>ROOMS SOLVED: <span style="color:#f2c14e">${solved.size} / 27</span>`;
+  const curL=where==='surface'?-1:where==='core'?1:room.L;let m='';
+  ['TOP','MID','BOT'].forEach((nm,L)=>{m+=`<div class="lay">${nm}<div class="g">`;for(let r=0;r<3;r++)for(let c=0;c<3;c++){const k=L+','+r+','+c;
+      const cls=[solved.has(k)?'done':'',(curL===L&&((where==='core'&&k==='1,1,1')||(where==='room'&&room.r===r&&room.c===c)))?'here':'',k==='1,1,1'?'core':''].join(' ');m+=`<span class="${cls}"></span>`}
+    m+='</div></div>'});$('map').innerHTML=m;
+  const bar0=$('bar');bar0.innerHTML='';const bar=document.createElement('div');bar.className='row';bar0.appendChild(bar);const B=(txt,fn,id)=>{const b=document.createElement('button');b.className='b';if(id)b.id=id;b.innerHTML=txt;b.onclick=fn;return b};
+  if(where==='surface'){const mb=B(mode==='explore'?'Puzzle':'Explore',toggleMode,'modeb');mb.classList.add('mode');bar.appendChild(mb)}
+  if(where!=='core'){bar.appendChild(B('💡',hint,'hintb'));bar.appendChild(B('⟲',where==='room'?resetRoom:resetSurface))}
+  if((where==='surface'&&mode==='explore')||where==='room'){const p=document.createElement('div');p.id='pad';const sd=i=>(i+Math.round(((-az)%360+360)%360/90)%4)%4;
+    [['',null],['▲',0],['',null],['◀',3],['▼',2],['▶',1]].forEach(([s,k])=>p.appendChild(k===null?document.createElement('span'):B(s,()=>step(sd(k)))));bar0.insertBefore(p,bar)}}
+function toggleMode(){if(where!=='surface'||busy)return;mode=mode==='explore'?'puzzle':'explore';if(mode==='puzzle')el=Math.max(el,45);act();hud()}
+function toast(s){const el=$('toast');el.innerHTML=s.replace(/\n/g,'<br><span style="font-size:16px;font-weight:600">');el.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.opacity=0,2000)}
+
+// ================= loop =================
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime,now=performance.now();
+  tiles.forEach(tl=>{const want=-tl.rot*Math.PI/2;let diff=want-tl.g.rotation.y;diff=Math.atan2(Math.sin(diff),Math.cos(diff));tl.g.rotation.y+=diff*Math.min(1,dt*12);
+    if(tl.star.visible)tl.star.rotation.y=t*2;tl.cover.material.emissive.setRGB(tl.black?.22+.18*Math.sin(t*4):0,tl.black?.06+.05*Math.sin(t*4):0,0)});
+  if(where==='surface'&&!busy){const tp=T(pr,pc).g;player.position.set(tp.position.x,TOP+.11,tp.position.z)}
+  halo.position.y=.6+Math.sin(t*3)*.03;
+  // pink hint: appears on request or after 15 s idle, fades after 4 s
+  if(!busy&&where!=='core'&&now-lastAct>15000&&!hintUntil)hint();
+  hintM.material.opacity=hintUntil>now?.55+.35*Math.sin(t*6):Math.max(0,hintM.material.opacity-dt*2);
+  if(room&&room.sh){const cd=new THREE.Vector3(cam.position.x,0,cam.position.z).normalize();
+    room.sh.walls.forEach(w=>{const vis=w.userData.n.dot(cd)<.35;w.visible=vis;if(w.userData.win){w.userData.win.visible=vis;w.userData.fr.visible=vis}})}
+  if(room&&room.kind==='core')room.holo.rotation.y=t*.4;
+  camUpdate(dt);ren.render(scene,cam)}
+resetSurface();camSnap();hud();loop();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>

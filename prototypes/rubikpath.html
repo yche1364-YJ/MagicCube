@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Cube · Path Edition</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d0f17;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#eef}
+  canvas{display:block;touch-action:none}
+  #help{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.5);padding:9px 13px;border-radius:8px;font-size:12px;line-height:1.5;max-width:250px}
+  #help b{display:block;font-size:15px;margin-bottom:3px;color:#f2c14e;letter-spacing:.03em}
+  #stat{position:fixed;top:10px;right:10px;background:rgba(0,0,0,.5);padding:8px 10px;border-radius:8px;font-size:12px;font-family:ui-monospace,Menlo,monospace;text-align:right;line-height:1.6}
+  .faces{display:flex;gap:4px;justify-content:flex-end;margin-top:4px}
+  .faces span{width:14px;height:14px;border-radius:3px;opacity:.25;border:1px solid rgba(255,255,255,.4)}
+  .faces span.ok{opacity:1;box-shadow:0 0 6px #1fd6e0}
+  #bar{position:fixed;left:0;right:0;bottom:16px;display:flex;justify-content:center;gap:10px}
+  .b{border:0;border-radius:12px;background:rgba(255,255,255,.16);color:#fff;font-size:15px;font-weight:700;height:48px;padding:0 16px;cursor:pointer}
+  .b:active{background:rgba(255,255,255,.32)}.go{background:#f2a33a;color:#1a1a1a}
+  #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%);font-size:28px;font-weight:800;text-shadow:0 2px 20px #000;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;width:90%}
+  @media (max-width:560px){#help{font-size:11px;max-width:190px}}
+</style>
+</head>
+<body>
+<div id="help"><b>MAGIC CUBE · PATHS</b>Swipe a sticker to turn its whole row, like a real cube.<br>Drag the background to look around.<br>Bring each face back to one colour — its paths join up and glow.</div>
+<div id="stat"></div>
+<div id="toast"></div>
+<div id="bar"><button class="b" id="undo">↶ Undo</button><button class="b go" id="scr">Scramble</button><button class="b" id="sol">Auto-solve</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0d0f17);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);document.body.appendChild(ren.domElement);
+const cam=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,.1,100);
+scene.add(new THREE.HemisphereLight(0xffffff,0x404050,.8));
+const dl=new THREE.DirectionalLight(0xffffff,.55);dl.position.set(5,8,6);scene.add(dl);
+const dl2=new THREE.DirectionalLight(0xffffff,.25);dl2.position.set(-6,-3,-5);scene.add(dl2);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const G=1.02;
+
+// ---------- faces: normal, colour, in-face axes (u = right, v = up as seen from outside) ----------
+const FACES=[
+  {k:'U',n:V(0,1,0), u:V(1,0,0), v:V(0,0,-1),col:'#f4f2ec'},
+  {k:'D',n:V(0,-1,0),u:V(1,0,0), v:V(0,0,1), col:'#f2c230'},
+  {k:'F',n:V(0,0,1), u:V(1,0,0), v:V(0,1,0), col:'#2fa84f'},
+  {k:'B',n:V(0,0,-1),u:V(-1,0,0),v:V(0,1,0), col:'#2f5fd0'},
+  {k:'R',n:V(1,0,0), u:V(0,0,-1),v:V(0,1,0), col:'#d8352e'},
+  {k:'L',n:V(-1,0,0),u:V(0,0,1), v:V(0,1,0), col:'#ef7a26'}];
+// Ring segments per face (corner ↔ edge), so each face draws its own route when solved.
+// key: "su,sv,a" = corner at (su,sv) linked to the edge along axis a ('u' → edge (0,sv), 'v' → edge (su,0))
+const RING={
+  U:['-1,1,u','1,1,u','-1,-1,u','1,-1,u','-1,1,v','-1,-1,v','1,1,v','1,-1,v'],// a square ring
+  D:['-1,1,u','1,-1,u'],                                                           // a Z
+  F:['-1,1,v','-1,-1,v','1,1,v','1,-1,v'],                                       // two side bars
+  B:['-1,1,u','1,1,u','-1,-1,u','1,-1,u'],                                       // top & bottom bars
+  R:['-1,1,u','-1,1,v','1,-1,u','1,-1,v'],                                       // two hooks
+  L:['1,1,u','1,1,v','-1,-1,u','-1,-1,v']};                                      // two other hooks
+
+// ---------- build the 27 cubelets ----------
+const cubies=[],stickers=[];
+const pathMat=()=>new THREE.MeshStandardMaterial({color:0x22252f,roughness:.6,emissive:0x000000});
+for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+  const c=new THREE.Group();c.position.set(x*G,y*G,z*G);scene.add(c);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x0b0c10,roughness:.8}));c.add(body);
+  const p=V(x,y,z);
+  FACES.forEach(f=>{if(Math.round(p.dot(f.n))!==1)return;
+    const cu=Math.round(p.dot(f.u)),cv=Math.round(p.dot(f.v));
+    // exits in face coords: [du,dv]
+    const ex=[];const add=(a,b)=>ex.push([a,b]);
+    if(cu===0&&cv===0){add(1,0);add(-1,0);add(0,1);add(0,-1)}                 // centre: a cross (looks the same any way round)
+    else if(cu===0||cv===0){add(-cu,-cv);add(cu,cv)}                           // edge: towards centre + across the cube edge to the next face
+    RING[f.k].forEach(s=>{const[su,sv,a]=s.split(',');const SU=+su,SV=+sv;
+      if(cu===SU&&cv===SV)add(a==='u'?-SU:0,a==='v'?-SV:0);                   // corner end
+      if(a==='u'&&cu===0&&cv===SV)add(SU,0);if(a==='v'&&cv===0&&cu===SU)add(0,SV)});// edge end
+    const g=new THREE.Group();
+    const base=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.03),new THREE.MeshStandardMaterial({color:new THREE.Color(f.col),roughness:.45}));g.add(base);
+    const pm=pathMat(),W=.16,H=.02;
+    if(ex.length){const hub=new THREE.Mesh(new THREE.BoxGeometry(W,W,H),pm);hub.position.z=.025;g.add(hub)}
+    ex.forEach(([du,dv])=>{const L=.45-W/2;const s=new THREE.Mesh(new THREE.BoxGeometry(du?L+.01:W,dv?L+.01:W,H),pm);s.position.set(du*(W/2+L/2),dv*(W/2+L/2),.025);g.add(s)});
+    // orient the sticker: local x→u, y→v, z→n
+    const m=new THREE.Matrix4().makeBasis(f.u,f.v,f.n);g.quaternion.setFromRotationMatrix(m);
+    g.position.copy(f.n).multiplyScalar(.5);c.add(g);
+    const st={g,base,pm,col:f.col,nLocal:f.n.clone(),cubie:c};base.userData.st=st;stickers.push(st)});
+  cubies.push(c)}
+
+// ---------- turning layers ----------
+let turning=false,solving=false;const queue=[],history=[],log=[];
+function layerOf(axis,idx){return cubies.filter(c=>Math.round(c.position.dot(axis)/G)===idx)}
+function snap(c){c.position.set(Math.round(c.position.x/G)*G,Math.round(c.position.y/G)*G,Math.round(c.position.z/G)*G);
+  const m=new THREE.Matrix4().makeRotationFromQuaternion(c.quaternion);const e=m.elements;for(let i=0;i<16;i++)e[i]=Math.round(e[i]);c.quaternion.setFromRotationMatrix(m)}
+function turn(axis,idx,dir,dur=.22,record=true){queue.push({axis,idx,dir,dur,record});if(!turning)next()}
+function next(){const mv=queue.shift();if(!mv){turning=false;if(solving){log.length=0;solving=false}check();return}turning=true;
+  const piv=new THREE.Group();scene.add(piv);const L=layerOf(mv.axis,mv.idx);L.forEach(c=>piv.attach(c));
+  const t0=performance.now();(function f(){const k=mv.dur?Math.min(1,(performance.now()-t0)/1000/mv.dur):1;const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    piv.setRotationFromAxisAngle(mv.axis,mv.dir*Math.PI/2*e);
+    if(k<1)requestAnimationFrame(f);else{L.forEach(c=>{scene.attach(c);snap(c)});scene.remove(piv);if(mv.dir){log.push(mv)}if(mv.record){history.push(mv);moves++}next()}})()}
+
+// ---------- solved check: each face one colour → its paths light up ----------
+let moves=0,wasSolved=0;
+function check(){let n=0;const ok={};
+  FACES.forEach(f=>{const on=stickers.filter(s=>s.nLocal.clone().applyQuaternion(s.cubie.quaternion).dot(f.n)>.9);
+    const one=on.every(s=>s.col===on[0].col);ok[f.k]=one?on[0].col:null;if(one)n++;
+    on.forEach(s=>{s.pm.color.set(one?0x1fd6e0:0x22252f);s.pm.emissive.set(one?0x0b6a70:0x000000)})});
+  const sv=Object.values(ok).filter(Boolean);
+  document.getElementById('stat').innerHTML=`MOVES ${moves}<br>FACES COMPLETE ${n} / 6<div class="faces">${sv.map(c=>`<span class="ok" style="background:${c}"></span>`).join('')}${Array(6-sv.length).fill('<span></span>').join('')}</div>`;
+  if(n===6&&moves>0&&!wasSolved)toast('SOLVED!<br><span style="font-size:16px">Every path is connected</span>');
+  else if(n>wasSolved&&moves>0)toast(`Face complete · ${n}/6`);wasSolved=n}
+function toast(h){const t=document.getElementById('toast');t.innerHTML=h;t.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity=0,1600)}
+
+// ---------- scramble / reset / undo ----------
+const AX=[V(1,0,0),V(0,1,0),V(0,0,1)];
+function scramble(){if(turning)return;let last=-1;for(let i=0;i<22;i++){let a;do a=Math.floor(Math.random()*3);while(a===last);last=a;
+    turn(AX[a],Math.floor(Math.random()*3)-1,Math.random()<.5?1:-1,0,false)}
+  history.length=0;moves=0;wasSolved=0;queue.push({axis:AX[0],idx:9,dir:0,dur:0,record:false})}
+document.getElementById('scr').onclick=()=>{scramble();toast('Scrambled')};
+document.getElementById('sol').onclick=()=>{if(turning||!log.length)return;solving=true;const h=log.splice(0);history.length=0;moves=0;wasSolved=6;
+  h.reverse().forEach(m=>turn(m.axis,m.idx,-m.dir,.07,false));queue.push({axis:AX[0],idx:9,dir:0,dur:0,record:false})};
+document.getElementById('undo').onclick=()=>{if(turning)return;const m=history.pop();if(m){moves--;turn(m.axis,m.idx,-m.dir,.18,false)}};
+
+// ---------- input: swipe a sticker = turn its row; drag elsewhere = orbit ----------
+let az=35,el=28,drag=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function camPlace(){const d=8.2*Math.max(1,.8/cam.aspect),a=az*Math.PI/180,e=el*Math.PI/180;cam.position.set(Math.sin(a)*Math.cos(e)*d,Math.sin(e)*d,Math.cos(a)*Math.cos(e)*d);cam.lookAt(0,0,0)}
+function toScreen(p){const v=p.clone().project(cam);return new THREE.Vector2((v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight)}
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);
+  const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,cam);
+  const hit=ray.intersectObjects(stickers.map(s=>s.base),false)[0];
+  drag={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,st:hit?hit.object.userData.st:null,pt:hit?hit.point.clone():null,done:false}});
+ren.domElement.addEventListener('pointermove',e=>{if(!drag)return;
+  if(!drag.st){az-=(e.clientX-drag.lx)*.4;el=Math.max(-80,Math.min(80,el+(e.clientY-drag.ly)*.4));drag.lx=e.clientX;drag.ly=e.clientY;camPlace();return}
+  if(drag.done||turning)return;const sw=new THREE.Vector2(e.clientX-drag.x,e.clientY-drag.y);if(sw.length()<18)return;
+  const n=drag.st.nLocal.clone().applyQuaternion(drag.st.cubie.quaternion).round();const P=drag.pt,s0=toScreen(P);let best=null;
+  AX.forEach(ax=>{if(Math.abs(ax.dot(n))>.5)return;const vel=ax.clone().cross(P).multiplyScalar(.3);const d=toScreen(P.clone().add(vel)).sub(s0);
+    const score=d.clone().normalize().dot(sw.clone().normalize());if(!best||Math.abs(score)>Math.abs(best.score))best={ax,score}});
+  if(best&&Math.abs(best.score)>.5){drag.done=true;const idx=Math.round(drag.st.cubie.position.dot(best.ax)/G);turn(best.ax,idx,Math.sign(best.score))}});
+ren.domElement.addEventListener('pointerup',()=>drag=null);
+
+function loop(){requestAnimationFrame(loop);ren.render(scene,cam)}
+camPlace();check();scramble();loop();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);camPlace()});
+</script>
+</body>
+</html>

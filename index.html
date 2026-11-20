@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Cube · 27 Rooms (Rubik edition)</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0d1c;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#eef}
+  canvas{display:block;touch-action:none}
+  #help{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.5);padding:9px 13px;border-radius:8px;font-size:12px;line-height:1.5;max-width:240px}
+  #help b{display:block;font-size:15px;margin-bottom:3px;letter-spacing:.03em}
+  #help i{display:block;font-style:normal;color:#cfd3e6;margin-top:4px}
+  #side{position:fixed;top:10px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  #stat{text-align:right;font-size:11px;line-height:1.5;font-family:ui-monospace,Menlo,monospace;background:rgba(0,0,0,.5);padding:6px 9px;border-radius:8px}
+  #map{display:flex;gap:6px;background:rgba(0,0,0,.5);padding:6px 8px;border-radius:8px}
+  .lay{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;color:#aab;font-family:ui-monospace,Menlo,monospace}
+  .g{display:grid;grid-template-columns:repeat(3,10px);gap:2px}
+  .g span{width:10px;height:10px;border-radius:2px;background:#2a2e3d}
+  .g span.done{background:#f2c14e}.g span.here{background:#5ff0e0;box-shadow:0 0 6px #5ff0e0}.g span.core{outline:1.5px solid #ff7a59}
+  #bar{position:fixed;left:0;right:0;bottom:22px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 10px}.row{display:flex;gap:10px}
+  .b{border:0;border-radius:12px;background:rgba(255,255,255,.16);color:#fff;font-size:15px;font-weight:700;min-width:52px;height:52px;padding:0 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .b:active{background:rgba(255,255,255,.32)}
+  .go{background:#f2a33a;color:#1a1a1a}.go3{background:#ffd166;color:#1a1a1a;font-size:16px}.blk{background:#111;border:2px solid #f2a33a}
+  #pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,52px);gap:6px}
+  #toast{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%);font-size:24px;font-weight:800;letter-spacing:.04em;text-shadow:0 2px 20px #000;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center;width:min(86%,440px);box-sizing:border-box;background:rgba(10,12,20,.78);padding:10px 18px;border-radius:14px}
+  #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none}
+  #panel{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);width:min(440px,calc(100% - 28px));background:rgba(10,12,20,.85);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:16px 18px;box-sizing:border-box;display:none;text-align:center}
+  #inv{position:fixed;left:10px;bottom:132px;display:flex;flex-wrap:wrap;gap:6px;max-width:46%;background:rgba(0,0,0,.5);padding:6px 8px;border-radius:10px;align-items:center}
+  #inv .ttl{width:100%;font-size:10px;letter-spacing:.08em;color:#aab;font-family:ui-monospace,Menlo,monospace}
+  .chip{width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);font-size:22px;font-weight:800;cursor:pointer;padding:0}
+  .chip:active{background:rgba(255,255,255,.3)}.pop{animation:pop .9s}.shake{animation:shake .45s}
+  @keyframes pop{30%{transform:scale(1.4)}}@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+  #gest{position:fixed;left:0;right:0;bottom:2px;text-align:center;font-size:11px;color:#a9a6c8;pointer-events:none;padding:0 10px}
+  .row{flex-wrap:wrap;justify-content:center}
+  .seg{display:flex;background:rgba(255,255,255,.1);border-radius:12px;padding:3px;gap:3px}
+  .segb{border:0;border-radius:9px;background:transparent;color:#cfcce6;font-size:14px;font-weight:700;height:44px;padding:0 12px;cursor:pointer}
+  .segb.on{background:#f2a33a;color:#1a1a1a}
+  .dim{opacity:.45}.sq{min-width:44px;padding:0;font-size:18px}
+  .segb{padding:0 10px}
+  #devlink{position:fixed;right:10px;bottom:24px;z-index:20;background:#e5484d;color:#fff;text-decoration:none;font:800 12px ui-monospace,Menlo,monospace;letter-spacing:.08em;padding:7px 12px;border-radius:999px;opacity:.85}
+  @media (max-width:560px){#devlink{bottom:118px}}
+  #hintb{background:#ff7aa2;color:#2a0a14}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(242,163,58,.45)}}.pulse{animation:pulse 1s infinite}
+  #panel h2{margin:0 0 6px;font-size:20px;color:#ff9c7a}#panel p{margin:0 0 6px;font-size:14px;line-height:1.5;color:#d8dbea}
+  @media (max-width:560px){#help{font-size:11px;max-width:175px;padding:7px 10px}#help b{font-size:13px}.ctl{display:none}}
+</style>
+</head>
+<body>
+<div id="help"></div>
+<div id="side"><div id="stat"></div><div id="map"></div></div>
+<div id="toast"></div>
+<div id="panel"></div>
+<div id="fade"></div>
+<a id="devlink" href="dev/">Dev</a>
+<div id="inv"></div>
+<div id="bar"></div>
+<div id="gest"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ================= scene =================
+const scene=new THREE.Scene();{const c=document.createElement('canvas');c.width=4;c.height=512;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,0,512);g.addColorStop(0,'#0b0d1c');g.addColorStop(.55,'#171a36');g.addColorStop(1,'#2e2550');x.fillStyle=g;x.fillRect(0,0,4,512);scene.background=new THREE.CanvasTexture(c)}
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);
+ren.shadowMap.enabled=true;document.body.appendChild(ren.domElement);
+const cam=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.05,300);
+scene.add(new THREE.HemisphereLight(0xfff6ee,0x6a5a9a,.7));
+const sun=new THREE.DirectionalLight(0xffffff,.55);sun.position.set(5,8,6);scene.add(sun);scene.add(sun.target);
+const dl2=new THREE.DirectionalLight(0xffffff,.25);dl2.position.set(-6,-3,-5);scene.add(dl2);
+const std=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:new THREE.Color(c),roughness:.55},o));
+const $=id=>document.getElementById(id);const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const tween=(dur,fn)=>new Promise(res=>{const t0=performance.now();(function f(){const k=dur?Math.min(1,(performance.now()-t0)/1000/dur):1;fn(k);k<1?requestAnimationFrame(f):res()})()});
+const wait=s=>new Promise(r=>setTimeout(r,s*1000));
+const G=1.02;
+
+// ================= the cube: 27 cubies, 54 path stickers =================
+const FACES=[
+  {k:'U',n:V(0,1,0), u:V(1,0,0), v:V(0,0,-1),col:'#fff6e6'},
+  {k:'D',n:V(0,-1,0),u:V(1,0,0), v:V(0,0,1), col:'#ffcf3f'},
+  {k:'F',n:V(0,0,1), u:V(1,0,0), v:V(0,1,0), col:'#4fcf8c'},
+  {k:'B',n:V(0,0,-1),u:V(-1,0,0),v:V(0,1,0), col:'#5aa2ff'},
+  {k:'R',n:V(1,0,0), u:V(0,0,-1),v:V(0,1,0), col:'#ff6b81'},
+  {k:'L',n:V(-1,0,0),u:V(0,0,1), v:V(0,1,0), col:'#ff9a45'}];
+// every corner keeps at least one link, so a solved face is always fully connected
+const RING={U:['-1,1,u','1,1,u','-1,-1,u','1,-1,u','-1,1,v','-1,-1,v','1,1,v','1,-1,v'],// square ring
+  D:['-1,1,u','1,1,v','1,-1,u','-1,-1,v'],   // pinwheel
+  F:['-1,1,v','-1,-1,v','1,1,v','1,-1,v'],   // two side bars
+  B:['-1,1,u','1,1,u','-1,-1,u','1,-1,u'],   // top & bottom bars
+  R:['-1,1,v','1,1,u','1,-1,v','-1,-1,u'],   // pinwheel the other way
+  L:['-1,1,u','1,1,u','-1,-1,v','1,-1,u']};  // a hook
+const HAM={"U:-1,-1":[[0,1],[1,0]],"U:0,-1":[[-1,0],[1,0]],"U:1,-1":[[-1,0],[0,-1]],"F:1,1":[[0,1],[1,0]],"R:-1,1":[[-1,0],[0,-1]],"R:-1,0":[[0,1],[-1,0]],"F:1,0":[[1,0],[-1,0]],"F:0,0":[[1,0],[0,1]],"F:0,1":[[0,-1],[-1,0]],"F:-1,1":[[1,0],[0,-1]],"F:-1,0":[[0,1],[0,-1]],"F:-1,-1":[[0,1],[1,0]],"F:0,-1":[[-1,0],[1,0]],"F:1,-1":[[-1,0],[1,0]],"R:-1,-1":[[-1,0],[0,-1]],"D:1,1":[[1,0],[-1,0]],"D:0,1":[[1,0],[-1,0]],"D:-1,1":[[1,0],[-1,0]],"L:1,-1":[[0,-1],[0,1]],"L:1,0":[[0,-1],[0,1]],"L:1,1":[[0,-1],[-1,0]],"L:0,1":[[1,0],[0,-1]],"L:0,0":[[0,1],[0,-1]],"L:0,-1":[[0,1],[0,-1]],"D:-1,0":[[-1,0],[1,0]],"D:0,0":[[-1,0],[1,0]],"D:1,0":[[-1,0],[1,0]],"R:0,-1":[[0,-1],[0,1]],"R:0,0":[[0,-1],[0,1]],"R:0,1":[[0,-1],[0,1]],"U:1,0":[[1,0],[-1,0]],"U:0,0":[[1,0],[0,1]],"U:0,1":[[0,-1],[1,0]],"U:1,1":[[-1,0],[1,0]],"R:1,1":[[0,1],[0,-1]],"R:1,0":[[0,1],[0,-1]],"R:1,-1":[[0,1],[0,-1]],"D:1,-1":[[1,0],[0,-1]],"B:-1,-1":[[0,-1],[0,1]],"B:-1,0":[[0,-1],[0,1]],"B:-1,1":[[0,-1],[1,0]],"B:0,1":[[-1,0],[0,-1]],"B:0,0":[[0,1],[0,-1]],"B:0,-1":[[0,1],[0,-1]],"D:0,-1":[[0,-1],[-1,0]],"D:-1,-1":[[1,0],[0,-1]],"B:1,-1":[[0,-1],[1,0]],"L:-1,-1":[[-1,0],[0,1]],"L:-1,0":[[0,-1],[-1,0]],"B:1,0":[[1,0],[0,1]],"B:1,1":[[0,-1],[1,0]],"L:-1,1":[[-1,0],[0,1]],"U:-1,1":[[-1,0],[0,-1]],"U:-1,0":[[0,1],[0,-1]]};
+// a turn (two openings at right angles) is drawn as a smooth arc; the traveller and pit sit on its middle
+const isTurn=ex=>ex.length===2&&ex[0][0]*ex[1][0]+ex[0][1]*ex[1][1]===0;
+function anchorSpin(st){if(!isTurn(st.ex))return[0,0];const sx=st.ex[0][0]+st.ex[1][0],sy=st.ex[0][1]+st.ex[1][1];return[.132*sx,.132*sy]}
+function anchorG(st){const[ax,ay]=anchorSpin(st),t=st.spin.rotation.z;return V(ax*Math.cos(t)-ay*Math.sin(t),ax*Math.sin(t)+ay*Math.cos(t),.085)}
+function drawPath(grp,ex,pm){grp.clear();if(!ex.length)return;
+  if(isTurn(ex)){const W=.17,H=.07,R=.45,sx=ex[0][0]+ex[1][0],sy=ex[0][1]+ex[1][1],cx=sx*.45,cy=sy*.45;
+    let t1=Math.atan2(ex[0][1]*.45-cy,ex[0][0]*.45-cx),t2=Math.atan2(ex[1][1]*.45-cy,ex[1][0]*.45-cx);
+    if(((t2-t1)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)>Math.PI){const k=t1;t1=t2;t2=k}if(t2<t1)t2+=2*Math.PI;
+    const sh=new THREE.Shape();sh.absarc(cx,cy,R+W/2,t1,t2,false);sh.absarc(cx,cy,R-W/2,t2,t1,true);
+    const m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:H,bevelEnabled:false,curveSegments:20}),pm);m.position.z=.015;grp.add(m);return}
+  if(ex.length===2&&ex[0][0]===-ex[1][0]&&ex[0][1]===-ex[1][1]){const W=.17,H=.07;const s=new THREE.Mesh(new THREE.BoxGeometry(ex[0][0]?.92:W,ex[0][0]?W:.92,H),pm);s.position.z=.015+H/2;grp.add(s);return}const W=.17,H=.07,Z=.015+H/2;const hub=new THREE.Mesh(new THREE.BoxGeometry(W,W,H),pm);hub.position.z=Z;grp.add(hub);
+  ex.forEach(([du,dv])=>{const L=.45-W/2;const s=new THREE.Mesh(new THREE.BoxGeometry(du?L+.01:W,dv?L+.01:W,H),pm);s.position.set(du*(W/2+L/2),dv*(W/2+L/2),Z);grp.add(s)})}
+const CROSS=[[1,0],[-1,0],[0,1],[0,-1]];
+// entrance tiles: dead end, L, straight, T or cross — always keeping at least one of its own (solved-state) openings
+// entrance tiles keep all of their own openings (so a solved cube always reaches them) and sometimes gain one more:
+// the result is a dead end, L, straight, T or cross
+function makeEntranceShape(st){const keep=st.ex.map(e=>e.slice());
+  if(false){const extra=shuffle(CROSS.filter(e=>!keep.some(k=>k[0]===e[0]&&k[1]===e[1])))[0];keep.push(extra.slice())}
+  st.ex=keep;drawPath(st.paths,st.ex,st.pm)}
+function makeCross(st){st.ex=CROSS.map(e=>e.slice());{const en=ENT.find(e=>e.st===st);if(en)en.dot.position.set(0,0,0)}if(st===on)setTimeout(()=>player.position.copy(anchorG(st)));st.rot=0;st.spin.rotation.z=0;drawPath(st.paths,st.ex,st.pm)}
+// only some edge pieces are 'bridges' that carry a path round the cube's edge:
+// the four round the top face, plus one down to the bottom face. They move when you turn rows.
+const BRIDGE=p=>(p.y===1&&(p.x===0||p.z===0))||(p.y===-1&&p.z===1&&p.x===0)||(p.y===0&&p.x===1&&p.z===1);
+const cube=new THREE.Group();scene.add(cube);
+const cubies=[],stickers=[];let cid=0;
+for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+  const c=new THREE.Group();c.position.set(x*G,y*G,z*G);c.userData.id=cid++;cube.add(c);
+  c.add(new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x14131d,roughness:.7})));
+  const p=V(x,y,z);
+  FACES.forEach(f=>{if(Math.round(p.dot(f.n))!==1)return;const cu=Math.round(p.dot(f.u)),cv=Math.round(p.dot(f.v));
+    const ex=[];const add=(a,b)=>{if(!ex.some(e=>e[0]===a&&e[1]===b))ex.push([a,b])};
+    const isCenter=cu===0&&cv===0;
+    // solved picture: ONE unbroken loop that runs through all 54 tiles and over every face
+    HAM[f.k+':'+cu+','+cv].forEach(([a,b])=>add(a,b));
+    const g=new THREE.Group();g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(f.u,f.v,f.n));g.position.copy(f.n).multiplyScalar(.5);c.add(g);
+    const spin=new THREE.Group();g.add(spin);
+    const base=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.03),new THREE.MeshStandardMaterial({color:new THREE.Color(f.col),roughness:.45}));spin.add(base);
+    const pm=new THREE.MeshStandardMaterial({color:0x1d1b27,roughness:.45});const paths=new THREE.Group();spin.add(paths);drawPath(paths,ex,pm);
+    const cover=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.08),new THREE.MeshStandardMaterial({color:0x050507,roughness:.9,emissive:0x000000}));cover.position.z=.04;cover.visible=false;g.add(cover);
+    const st={g,spin,paths,base,pm,cover,col:f.col,ex,rot:0,black:false,center:isCenter,cubie:c};base.userData.st=st;cover.userData.st=st;stickers.push(st)});
+  cubies.push(c)}
+const coreCubie=cubies.find(c=>c.position.lengthSq()<.01);
+
+// sticker geometry in the world, recomputed on demand
+const tmpQ=new THREE.Quaternion();
+let fver=0,posMap=null;
+function frame(st){if(st._fv===fver)return st._f;st.g.getWorldQuaternion(tmpQ);const X=V(1,0,0).applyQuaternion(tmpQ).round(),Y=V(0,1,0).applyQuaternion(tmpQ).round(),N=V(0,0,1).applyQuaternion(tmpQ).round();
+  st._fv=fver;return st._f={X,Y,N,P:st.g.getWorldPosition(V(0,0,0))}}
+const pkey=(p,n)=>[p.x,p.y,p.z,n.x,n.y,n.z].map(v=>Math.round(v*10)).join();
+function stAt(p,n){if(!posMap||posMap.v!==fver){posMap=new Map();posMap.v=fver;stickers.forEach(s=>{const f=frame(s);posMap.set(pkey(f.P,f.N),s)})}return posMap.get(pkey(p,n))}
+function worldExits(st){const{X,Y}=frame(st);return st.ex.map(([u,v])=>{for(let i=0;i<st.rot;i++)[u,v]=[-v,u];return X.clone().multiplyScalar(u).add(Y.clone().multiplyScalar(v)).round()})}
+const has=(list,w)=>list.some(e=>e.equals(w));
+// neighbour across a sticker edge in world direction w: same face, or wrap round the cube edge
+function neighbour(st,w){const f=frame(st);const q=f.P.clone().add(w.clone().multiplyScalar(G));
+  if(Math.abs(q.x)<1.6*G&&Math.abs(q.y)<1.6*G&&Math.abs(q.z)<1.6*G&&Math.abs(q.dot(f.N)-1.5*G)<.3){
+    return{st:stAt(q,f.N),back:w.clone().negate()}}
+  return{st:stickers.find(s=>s.cubie===st.cubie&&frame(s).N.equals(w)),back:f.N.clone(),wrap:true}}
+function linked(a,w){const nb=neighbour(a,w);if(!nb.st)return null;if(nb.st.black)return{...nb,hole:true};return has(worldExits(nb.st),nb.back)?nb:null}
+
+// ================= layer turns =================
+let turning=false,solving=false;const queue=[],log=[];
+const AX=[V(1,0,0),V(0,1,0),V(0,0,1)];
+function snap(c){c.position.set(Math.round(c.position.x/G)*G,Math.round(c.position.y/G)*G,Math.round(c.position.z/G)*G);
+  const m=new THREE.Matrix4().makeRotationFromQuaternion(c.quaternion);const e=m.elements;for(let i=0;i<16;i++)e[i]=Math.round(e[i]);c.quaternion.setFromRotationMatrix(m)}
+function turn(axis,idx,dir,dur=.22){return new Promise(res=>{queue.push({axis,idx,dir,dur,res});if(!turning)next()})}
+function next(){const mv=queue.shift();if(!mv){turning=false;if(solving){log.length=0;solving=false}checkFaces();hud();return}turning=true;
+  const piv=new THREE.Group();cube.add(piv);const L=cubies.filter(c=>Math.round(c.position.dot(mv.axis)/G)===mv.idx);L.forEach(c=>piv.attach(c));
+  tween(mv.dur,k=>{const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;piv.setRotationFromAxisAngle(mv.axis,mv.dir*Math.PI/2*e)}).then(()=>{L.forEach(c=>{cube.attach(c);snap(c)});cube.remove(piv);fver++;
+    if(mv.dir&&!solving)log.push(mv);mv.res&&mv.res();next()})}
+
+// ================= faces complete → paths realign and glow =================
+let facesDone=0;
+// a finished face turns each tile back the way it was drawn (centres can come back twisted, so match the world directions)
+function alignHome(s){if(!s.homeW)return;const k0=s.rot;let best=0;
+  for(let k=0;k<4;k++){s.rot=k;const w=worldExits(s);if(w.length===s.homeW.length&&w.every(x=>has(s.homeW,x))){best=k;break}}
+  s.rot=best;s.spin.rotation.z=best*Math.PI/2;if(s===on&&k0!==best)player.position.copy(anchorG(s))}
+function checkFaces(){let n=0;
+  FACES.forEach(f=>{const on=stickers.filter(s=>frame(s).N.equals(f.n));const one=on.every(s=>s.col===on[0].col);if(one)n++;
+    on.forEach(s=>{if(one)alignHome(s);s.pm.color.set(one?0x2b1d5c:0x1d1b27);s.pm.emissive=new THREE.Color(one?0x5a3fd0:0x000000)})});
+  if(n>facesDone&&started){toast(n===6?'ALL SIX FACES!\nThe true ending awaits…':`FACE COMPLETE · ${n}/6`)}facesDone=n}
+
+// ================= traveller =================
+const player=new THREE.Group();scene.add(player);const pm=std('#3b78c9',{roughness:.35});
+const body=new THREE.Group();player.add(body);
+const pb=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,.2,20),pm);pb.rotation.x=Math.PI/2;pb.position.z=.2;body.add(pb);
+[.1,.3].forEach(z=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.11,20,14),pm);s.position.z=z;body.add(s)});
+const halo=new THREE.Mesh(new THREE.SphereGeometry(.04,12,8),new THREE.MeshBasicMaterial({color:0x8affc1}));halo.position.z=.5;body.add(halo);
+let on=null,goal=null,arrived=false;const myTurns=[];
+const beacon=new THREE.Group();
+{const fr=new THREE.Mesh(new THREE.RingGeometry(.46,.56,4,1),new THREE.MeshBasicMaterial({color:0xffd166,transparent:true,side:2,depthTest:false}));fr.rotation.z=Math.PI/4;fr.renderOrder=8;beacon.add(fr);
+ const col=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,1.4,12,1,true),new THREE.MeshBasicMaterial({color:0xffd166,transparent:true,opacity:.35,side:2,depthWrite:false}));col.rotation.x=Math.PI/2;col.position.z=.7;beacon.add(col);beacon.userData={fr,col}}
+function setGoal(st){goal=st;if(st){st.g.add(beacon);beacon.position.set(0,0,.1);beacon.visible=true}else{beacon.visible=false;scene.add(beacon)}}// sticker under the traveller (player is parented to its group, so it rides every turn)
+function standOn(st){on=st;st.g.attach(player);player.position.copy(anchorG(st));player.quaternion.identity()}
+
+// ================= state =================
+let where='surface',mode='explore',busy=false,room=null,started=false,entry=null;
+const solvedIds=new Set();
+const posOf=c=>c.position.clone().divideScalar(G).round();
+const keyOf=c=>{const p=posOf(c);return (1-p.y)+','+(p.z+1)+','+(p.x+1)};
+function solvedAt(k){return cubies.some(c=>solvedIds.has(c.userData.id)&&keyOf(c)===k)}
+
+// ================= routes on the cube surface =================
+function bfs(goal){// goal(st) → true to stop. Returns path of stickers (excluding start)
+  const prev=new Map([[on,null]]),q=[on];
+  while(q.length){const a=q.shift();for(const w of worldExits(a)){const nb=linked(a,w);if(!nb||prev.has(nb.st))continue;prev.set(nb.st,a);
+      if(goal(nb.st)){const path=[];let s=nb.st;while(s&&s!==on){path.unshift(s);s=prev.get(s)}return path}
+      if(!nb.st.black)q.push(nb.st)}}
+  return null}
+const routeToHole=()=>bfs(s=>s.black);
+async function walk(path){for(const st of path){const a=frame(on),b=frame(st);const wrap=!a.N.equals(b.N);
+    scene.attach(player);const p0=player.position.clone(),q0=player.quaternion.clone();
+    const q1=new THREE.Quaternion();st.g.getWorldQuaternion(q1);st.g.updateMatrixWorld(true);const p1=st.g.localToWorld(anchorG(st));
+    const mid=wrap?a.P.clone().add(b.P).multiplyScalar(.5).add(a.N.clone().add(b.N).multiplyScalar(.35)):null;
+    await tween(wrap?.45:.3,k=>{if(wrap){const k1=Math.min(1,k*2),k2=Math.max(0,k*2-1);player.position.copy(k<.5?p0.clone().lerp(mid,k1):mid.clone().lerp(p1,k2))}
+      else{player.position.lerpVectors(p0,p1,k);player.position.add(a.N.clone().multiplyScalar(Math.sin(k*Math.PI)*.1))}player.quaternion.slerpQuaternions(q0,q1,k)});
+    standOn(st);if(wrap)faceCamTo(b.N)}}
+async function walkTo(st){if(st===on)return;arrived=false;const path=bfs(s=>s===st);act();if(!path){toast('No path there yet\nTry Puzzle mode');return}
+  busy=true;await walk(path);if(on.black)await fallInto(on);else{busy=false;arrivedSurface()}hud()}
+function arrivedSurface(){arrived=true;if(entAt(on)){toast(on===goal?'You found it!\nPress 3D Puzzle to go inside':'A room entrance\nPress 3D Puzzle to go inside')}hud()}
+// arrow keys: pick the tile direction that best matches the screen direction
+const camDir=k=>{const r=V(1,0,0).applyQuaternion(cam.quaternion),u=V(0,1,0).applyQuaternion(cam.quaternion);return k==='up'?u:k==='down'?u.negate():k==='right'?r:r.negate()};
+async function keyStep(k){if(busy||turning)return;act();const want=camDir(k);
+  if(where==='surface'&&mode==='puzzle'){if(k==='left')az+=90;if(k==='right')az-=90;if(k==='up')el=Math.min(75,el+30);if(k==='down')el=Math.max(-75,el-30);return}
+  if(where==='surface'){if(mode!=='explore')return;const f=frame(on);const w0=want.clone().sub(f.N.clone().multiplyScalar(want.dot(f.N)));
+    const w=[f.X,f.X.clone().negate(),f.Y,f.Y.clone().negate()].reduce((a,b)=>b.dot(w0)>a.dot(w0)?b:a);
+    const has_=has(worldExits(on),w);const nb=has_?linked(on,w):null;if(!nb){bumpDir(w);return}
+    busy=true;await walk([nb.st]);if(on.black)await fallInto(on);else{busy=false;arrivedSurface()}}
+  else if(where==='room'&&!room.hits){const w0=V(want.x,0,want.z);const dirs=[[V(0,0,-1),-1,0],[V(0,0,1),1,0],[V(1,0,0),0,1],[V(-1,0,0),0,-1]];
+    const d=dirs.reduce((a,b)=>b[0].dot(w0)>a[0].dot(w0)?b:a);const nr=rr+d[1],nc=rc+d[2];if(nr>=0&&nr<3&&nc>=0&&nc<3)tapRoomCell(nr,nc)}}
+async function bumpDir(w){const p0=player.position.clone();const lw=w.clone();if(player.parent!==scene){const q=new THREE.Quaternion();player.parent.getWorldQuaternion(q);lw.applyQuaternion(q.invert())}
+  await tween(.22,k=>player.position.copy(p0).add(lw.clone().multiplyScalar(Math.sin(k*Math.PI)*.12)));player.position.copy(p0)}
+async function enterGoal(){if(on!==goal||busy)return;const g=goal;g.black=true;g.cover.visible=true;await fallInto(g)}
+
+// ================= puzzle actions =================
+async function spinTile(st){if(st.black){toast('Hold it to close the hole');return}st.rot=(st.rot+1)%4;act();const r0=st.spin.rotation.z;
+  await tween(.18,k=>{st.spin.rotation.z=r0+k*Math.PI/2;if(st===on)player.position.copy(anchorG(st))});st.spin.rotation.z=st.rot*Math.PI/2;if(st===on)player.position.copy(anchorG(st));afterChange()}
+async function flipTile(st){if(st.center){toast("Center tiles won't flip");return}if(st===on){toast('The traveller is standing on it');return}
+  busy=true;act();const others=stickers.filter(o=>o.black&&o!==st);
+  const fl=(x,b)=>tween(.35,k=>{x.g.scale.set(1,Math.abs(Math.cos(k*Math.PI)),1);if(k>=.5)x.cover.visible=b}).then(()=>{x.g.scale.set(1,1,1);x.black=b;x.cover.visible=b});
+  await Promise.all([fl(st,!st.black),...others.map(o=>fl(o,false))]);busy=false;afterChange()}
+function afterChange(){hud();if(goal&&on!==goal&&bfs(s=>s===goal)){toast('A path to the glowing tile is open!\nSwitch to Explore');$('modeb')&&$('modeb').classList.add('pulse');return}const p=routeToHole();if(p){toast('Path connected!\nSwitch to Explore and walk in');$('modeb')&&$('modeb').classList.add('pulse')}}
+
+// ================= hints (pink, only when asked) =================
+const hintM=new THREE.Mesh(new THREE.RingGeometry(.42,.6,4,1),new THREE.MeshBasicMaterial({color:0xff7aa2,transparent:true,opacity:0,side:2,depthTest:false}));hintM.renderOrder=9;scene.add(hintM);
+let hintUntil=0,lastAct=performance.now();const act=()=>{lastAct=performance.now();hintUntil=0};
+function showHint(pos,quat,size,text){hintM.position.copy(pos);hintM.quaternion.copy(quat);hintM.rotateZ(Math.PI/4);hintM.scale.setScalar(size);hintUntil=performance.now()+4000;if(text)toast(text)}
+function hintSt(st,text){const f=frame(st);const q=new THREE.Quaternion();st.g.getWorldQuaternion(q);showHint(f.P.clone().add(f.N.clone().multiplyScalar(.06)),q,1,text)}
+function hint(){act();
+  if(where==='surface'){const p=routeToHole();
+    if(mode==='explore'){if(p)return hintSt(p[p.length-1],'Tap the hole to walk in');return toast('No way in yet\nSwitch to Puzzle mode')}
+    if(p)return hintSt(p[p.length-1],'Path is ready — switch to Explore');
+    const hole=stickers.find(s=>s.black);
+    if(hole)for(const s of stickers){if(s.black)continue;const r0=s.rot;for(let k=1;k<4;k++){s.rot=(r0+k)%4;if(routeToHole()){s.rot=r0;return hintSt(s,`Tap this tile ${k===1?'once':k+' times'}`)}}s.rot=r0}
+    for(const s of stickers){if(s.black||s.center||s===on)continue;const was=hole;if(was)was.black=false;s.black=true;const ok=routeToHole();s.black=false;if(was)was.black=true;if(ok)return hintSt(s,'Hold this tile to open a hole')}
+    return hintSt(on,'Turn the tile under the traveller')}
+  if(where==='room'&&room.kind==='A'){if(room.hatch)return roomHint(1,1,'Step into the hole');
+    let best=null;for(let m=1;m<8;m++){const o=room.on.slice();const seq=[];room.BTN.forEach((b,i)=>{if(m>>i&1){b.t.forEach(x=>o[x]=!o[x]);seq.push(b)}});if(o.every(x=>x)&&(!best||seq.length<best.length))best=seq}
+    if(best){const b=best.find(b=>!(b.r===rr&&b.c===rc))||best[0];return roomHint(b.r,b.c,b.r===rr&&b.c===rc?'Step off and back on':'Step on this button')}}
+  if(where==='room'&&room.kind==='B'){const order=['0,1','0,0','1,0','2,0'];const done=order.slice(0,room.black.size);
+    if(![...room.black].every(x=>done.includes(x))||(room.black.size&&(rr+','+rc)!==done[done.length-1]))return toast('Off track — tap ⟲ to reset');
+    const[i,j]=order[room.black.size].split(',').map(Number);return roomHint(i,j,'Step here next')}}
+function roomHint(i,j,t){const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,0));showHint(roomPos(i,j).setY(RY+.2),q,S,t)}
+
+// ================= rooms (inside the cube) =================
+let rr=1,rc=1;
+// ================= rooms =================
+const RY=-60,S=1.25;// rooms live far below; S = floor cell size
+const roomG=new THREE.Group();scene.add(roomG);
+function cubeType(L,r,c){const sides=(r!==1)+(c!==1);const faces=sides+(L!==1?1:0);
+  if(L===1&&r===1&&c===1)return{name:'Core',faces:0};return{name:faces===3?'Corner':faces===2?'Edge':'Center',faces}}
+function roomPos(r,c){return new THREE.Vector3((c-1)*S,RY+.12,(r-1)*S)}
+function clearRoom(){roomG.children.slice().forEach(o=>roomG.remove(o));room=null}
+function shell(L,r,c,floorCol,wallCol){
+  const walls=[];const H=2.6,W=3*S;
+  const wall=(nx,nz)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(nx?.12:W+.24,H,nz?.12:W+.24),std(wallCol,{roughness:.9}));
+    m.position.set(nx*(W/2+.06),RY+H/2,nz*(W/2+.06));m.receiveShadow=true;roomG.add(m);m.userData.n=new THREE.Vector3(nx,0,nz);walls.push(m);
+    // window on faces that are outside the big cube
+    const outside=(nz===-1&&r===0)||(nz===1&&r===2)||(nx===-1&&c===0)||(nx===1&&c===2);
+    if(outside){const w=new THREE.Mesh(new THREE.PlaneGeometry(.9,1.1),new THREE.MeshBasicMaterial({color:0x8fd8ff}));
+      const tx=nz?-.8:0,tz=nx?.8:0;w.position.set(nx*(W/2-.005)+tx,RY+1.35,nz*(W/2-.005)+tz);w.lookAt(new THREE.Vector3(tx,RY+1.35,tz));m.userData.win=w;roomG.add(w);
+      const fr=new THREE.Mesh(new THREE.PlaneGeometry(.06,1.1),new THREE.MeshBasicMaterial({color:0x223}));fr.position.copy(w.position).multiplyScalar(1).add(new THREE.Vector3(0,0,0));fr.position.set(w.position.x*.999,w.position.y,w.position.z*.999);fr.lookAt(new THREE.Vector3(tx,RY+1.35,tz));roomG.add(fr);m.userData.fr=fr}
+    return m};
+  wall(0,-1);wall(0,1);wall(-1,0);wall(1,0);
+  const fl=new THREE.Mesh(new THREE.BoxGeometry(W+.24,.2,W+.24),std('#1b1d27'));fl.position.y=RY-.1;fl.receiveShadow=true;roomG.add(fl);
+  const tilesR=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++){const t=new THREE.Mesh(new THREE.BoxGeometry(S*.94,.12,S*.94),std(floorCol));t.position.copy(roomPos(i,j)).setY(RY+.06);t.receiveShadow=true;roomG.add(t);tilesR.push(t)}
+  const lt=new THREE.PointLight(0xfff0d8,.7,9);lt.position.set(0,RY+2.3,0);roomG.add(lt);
+  return{walls,floor:tilesR}}
+function buildRoomA(r,c){// top layer: three lamps, three floor buttons
+  const sh=shell(0,r,c,'#d9c7a8','#e9dcc6');
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,6,16,1,true),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.08,side:2,depthWrite:false}));beam.position.set(0,RY+3,0);roomG.add(beam);
+  const lamps=[0,1,2].map(i=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.17,20,14),std('#555',{emissive:0x000000}));m.position.set(.1+(i-1)*.62,RY+2.0,-1.5*S+.25);roomG.add(m);
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(.05,.05,.25),std('#333'));arm.position.set(.1+(i-1)*.62,RY+2.0,-1.5*S+.12);roomG.add(arm);return m});
+  const BTN=[{r:0,c:0,t:[0,1],col:'#e2b53a'},{r:0,c:2,t:[1,2],col:'#3fa34d'},{r:2,c:1,t:[0,2],col:'#2f55c8'}];
+  BTN.forEach(b=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.08,24),std(b.col,{emissive:0x111111}));p.position.copy(roomPos(b.r,b.c)).setY(RY+.16);roomG.add(p);b.mesh=p;
+    b.t.forEach((li,k)=>{const d=new THREE.Mesh(new THREE.SphereGeometry(.06,10,8),std('#fff'));d.position.copy(p.position).add(new THREE.Vector3((k-.5)*.28+(li-1)*.0,.07,0));roomG.add(d)})});
+  return{kind:'A',L:0,r,c,sh,lamps,on:[false,true,false],BTN,hatch:false,land:[1,1]}}
+function buildRoomB(r,c){// middle layer: draw the shape in one stroke
+  const sh=shell(1,r,c,'#e9e6df','#c9d6e8');
+  const target=new Set(['0,1','0,0','1,0','2,0']);
+  const board=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,.05),std('#f4f2ec'));board.position.set(.75,RY+1.4,-1.5*S+.1);roomG.add(board);
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++){const q=new THREE.Mesh(new THREE.PlaneGeometry(.33,.33),new THREE.MeshBasicMaterial({color:target.has(i+','+j)?0x111111:0xd8d4cb}));
+    q.position.set(.75+(j-1)*.37,RY+1.4+(1-i)*.37,-1.5*S+.13);roomG.add(q)}
+  return{kind:'B',L:1,r,c,sh,target,black:new Set(),land:[1,1]}}
+function buildCore(){
+  const g=new THREE.Group();g.position.y=RY;roomG.add(g);
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(3,3,.2,48),std('#151824'));disc.position.y=-.1;disc.receiveShadow=true;g.add(disc);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(3,.04,8,64),new THREE.MeshBasicMaterial({color:0xff7a59}));ring.rotation.x=Math.PI/2;g.add(ring);
+  const holo=new THREE.Group();holo.position.set(0,2.1,-1.2);g.add(holo);
+  for(let L=0;L<3;L++)for(let r=0;r<3;r++)for(let c=0;c<3;c++){const k=L+','+r+','+c,isCore=k==='1,1,1',done=solvedAt(k);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,.3),new THREE.MeshStandardMaterial({color:isCore?0xff7a59:done?0xf2c14e:0x6a7290,emissive:isCore?0x662010:done?0x5a4010:0x000000,transparent:true,opacity:isCore||done?.95:.28}));
+    m.position.set((c-1)*.38,(1-L)*.38,(r-1)*.38);holo.add(m)}
+  const lt=new THREE.PointLight(0xff9c7a,1.4,10);lt.position.set(0,2.4,-1);g.add(lt);
+  return{kind:'core',holo,land:null}}
+
+function typeOf(c){const p=posOf(c);const n=(p.x!==0)+(p.y!==0)+(p.z!==0);return n===3?'Corner':n===2?'Edge':n===1?'Center':'Core'}
+function layerName(c){const y=posOf(c).y;return y===1?'TOP':y===0?'MIDDLE':'BOTTOM'}
+async function tapRoomCell(r,c){if(busy)return;act();
+  if(room.kind==='A'){const isBtn=(i,j)=>room.BTN.some(b=>b.r===i&&b.c===j);
+    const key=(i,j)=>i+','+j,prev={},q=[[rr,rc]];prev[key(rr,rc)]=null;let found=r===rr&&c===rc;
+    while(q.length&&!found){const[i,j]=q.shift();for(const[dx,dz]of[[0,-1],[1,0],[0,1],[-1,0]]){const ni=i+dz,nj=j+dx;if(ni<0||ni>2||nj<0||nj>2||key(ni,nj)in prev)continue;
+      const dest=ni===r&&nj===c;if(!dest&&isBtn(ni,nj))continue;prev[key(ni,nj)]=key(i,j);if(dest){found=true;break}q.push([ni,nj])}}
+    if(!found||(r===rr&&c===rc))return;const path=[];let k=key(r,c);while(k&&k!==key(rr,rc)){path.unshift(k.split(',').map(Number));k=prev[k]}
+    busy=true;await roomWalk(path);busy=false;arrivedRoom()}
+  else{if(Math.abs(r-rr)+Math.abs(c-rc)!==1){toast('One step at a time');return}if(room.black.has(r+','+c)){toast("Black tiles can't be stepped on");return}
+    busy=true;await roomWalk([[r,c]]);busy=false;arrivedRoom()}}
+async function roomWalk(path){for(const[r,c]of path){const from=player.position.clone(),to=roomPos(r,c);player.rotation.set(0,Math.atan2(c-rc,r-rr),0);
+    await tween(.3,k=>{player.position.lerpVectors(from,to,k);player.position.y+=Math.sin(k*Math.PI)*.12});rr=r;rc=c}}
+function arrivedRoom(){const e=room.ent;
+  if(room.kind==='A'){const b=room.BTN.find(b=>b.r===rr&&b.c===rc);
+    if(b&&!room.done){b.t.forEach(i=>room.on[i]=!room.on[i]);lampDraw();
+      if(room.on.every(x=>x)){room.done=true;room.gem.visible=true;const y0=room.gem.position.y;tween(.8,k=>{room.gem.position.y=y0+Math.sin(k*Math.PI)*.3;room.gem.rotation.y=k*6});
+        setTimeout(()=>{room.gem.visible=false;giveItem(e.item);markSolved(e)},900)}}}
+  else if(!room.done){room.black.add(rr+','+rc);room.sh.floor[rr*3+rc].material=std('#111');
+    const ok=room.black.size===room.target.size&&[...room.black].every(x=>room.target.has(x));
+    if(ok){room.done=true;room.prize.visible=true;tween(.9,k=>room.prize.rotation.y=k*6.3).then(()=>{room.prize.visible=false;giveItem(e.item);markSolved(e)})}
+    else if(![[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dz])=>{const i=rr+dz,j=rc+dx;return i>=0&&i<3&&j>=0&&j<3&&!room.black.has(i+','+j)}))toast('Stuck!\nTap ⟲ to reset the room')}
+  hud()}
+function lampDraw(){room.lamps.forEach((m,i)=>{m.material.color.set(room.on[i]?'#ffe27a':'#555');m.material.emissive.set(room.on[i]?0xffb020:0x000000)})}
+function resetRoom(){if(where!=='room'||busy||room.done)return;if(room.kind==='A'){room.on=room.on0.slice();lampDraw()}
+  else{room.black.clear();room.sh.floor.forEach(t=>t.material=std('#e9e6df'))}rr=1;rc=1;player.position.copy(roomPos(1,1));hud()}
+
+// ================= falling =================
+async function fade(to,dur=.35){const f=$('fade'),a=+f.style.opacity||0;await tween(dur,k=>f.style.opacity=a+(to-a)*k)}
+async function dropIn(){const to=roomPos(rr,rc),from=to.clone().setY(to.y+4);player.position.copy(from);await Promise.all([fade(0,.4),tween(.7,k=>player.position.lerpVectors(from,to,k*k))])}
+function enterRoomSpace(){az=-30;el=42;scene.attach(player);player.quaternion.identity();player.rotation.set(0,0,0);body.rotation.set(-Math.PI/2,0,0)}
+async function fallInto(st){busy=true;hintUntil=0;const wasGoal=st===goal;if(wasGoal)setGoal(null);const f=frame(st);const p0=player.getWorldPosition(V(0,0,0));scene.attach(player);
+  await tween(1,k=>{player.position.copy(p0).add(f.N.clone().multiplyScalar(-k*k*1.6));st.g.position.copy(st.g.parent.worldToLocal?st.g.position:st.g.position);if(k>.6)$('fade').style.opacity=(k-.6)/.4});
+  const a=st.cubie,bp=posOf(a).sub(f.N);const b=cubies.find(c=>posOf(c).equals(bp));entry={st,a,b,n:f.N.clone(),wasGoal};
+  cube.visible=false;clearRoom();const pa=posOf(a);room=buildRoomA(pa.z+1,pa.x+1);lampDraw();where='room';rr=1;rc=1;enterRoomSpace();
+  if(solvedIds.has(a.userData.id)){room.on=[true,true,true];lampDraw();room.hatch=true;openHatch(true)}
+  camSnap();await dropIn();busy=false;act();toast(`${layerName(a)} LAYER · ${typeOf(a).toUpperCase()}`);hud()}
+async function openHatch(instant){const tl=room.sh.floor[4];const y0=tl.position.y;if(instant){tl.visible=false;return}await tween(.8,k=>tl.position.y=y0-k*1.5);tl.visible=false}
+async function fallDown(){busy=true;const p0=player.position.clone();await tween(.9,k=>{player.position.y=p0.y-k*k*2.5;if(k>.5)$('fade').style.opacity=(k-.5)/.5});
+  const b=entry.b;if(b===coreCubie){return toCore()}
+  clearRoom();const pb=posOf(b);room=buildRoomB(pb.z+1,pb.x+1);where='room';rr=1;rc=1;az=-30;el=42;camSnap();await dropIn();busy=false;act();
+  toast(`${layerName(b)} LAYER · ${typeOf(b).toUpperCase()}`);hud()}
+async function fallCore(){busy=true;await wait(.4);const ks=[...room.black];
+  await tween(.8,k=>ks.forEach(s=>{const[i,j]=s.split(',').map(Number);room.sh.floor[i*3+j].position.y=RY+.06-k*1.5}));
+  const p0=player.position.clone();await tween(.9,k=>{player.position.y=p0.y-k*k*2.5;if(k>.5)$('fade').style.opacity=(k-.5)/.5});toCore()}
+async function toCore(){clearRoom();solvedIds.add(coreCubie.userData.id);room=buildCore();where='core';
+  player.position.set(0,RY+4,1.2);camSnap();await Promise.all([fade(0,.5),tween(.8,k=>player.position.y=RY+4-k*k*4)]);busy=false;hud();
+  const n=solvedIds.size,p=$('panel');
+  p.innerHTML=`<h2>You reached the CORE</h2><p>Normal ending ✓</p><p><b>${n} / 27</b> rooms solved · <b>${facesDone} / 6</b> faces restored.<br>Restore all six faces for the true ending.</p>`;
+  const bt=document.createElement('button');bt.className='b go';bt.textContent='Back to the cube';bt.style.marginTop='6px';bt.onclick=backToCube;p.appendChild(bt);p.style.display='block'}
+async function backToCube(){$('panel').style.display='none';busy=true;await fade(1,.4);clearRoom();where='surface';mode='explore';cube.visible=true;
+  stickers.forEach(s=>{s.black=false;s.cover.visible=false});body.rotation.set(0,0,0);standOn(startSticker());faceCamTo(frame(on).N);camSnap();await fade(0,.5);busy=false;act();
+  toast('Open another hole —\nthe cube keeps your turns');hud()}
+function pickGoal(){// first level: a corner tile on the top face, away from the start
+  const c=stickers.filter(s=>{const f=frame(s);return f.N.y===1&&Math.abs(f.P.x)>.5&&Math.abs(f.P.z)>.5});setGoal(c[Math.floor(Math.random()*c.length)])}
+async function leaveRoom(){if(busy||where!=='room')return;busy=true;act();
+  const p0=player.position.clone();await Promise.all([tween(.6,k=>player.position.y=p0.y+k*k*3),fade(1,.6)]);
+  clearRoom();where='surface';mode='explore';cube.visible=true;body.rotation.set(0,0,0);
+  stickers.forEach(s=>{s.black=false;s.cover.visible=false});
+  const st=entry.st;standOn(st);if(entry.wasGoal&&!solvedIds.has(entry.a.userData.id))setGoal(st);
+  faceCamTo(frame(st).N);camSnap();await fade(0,.5);busy=false;
+  toast(goal===st?'Back where you came in\nPress 3D Puzzle to try again':'Back on the cube\nYou can come back any time');hud()}
+function startSticker(){return stickers.find(s=>s.center&&frame(s).N.equals(V(0,1,0)))}
+
+// ================= 26 rooms: entrances, items, inventory =================
+const GEMC={red:'#e5484d',blue:'#3e7bfa',green:'#30a46c'};
+const GLY={star:'★',triangle:'▲',heart:'♥'};
+const cap=s=>s[0].toUpperCase()+s.slice(1);
+function itemOf(kind,v){if(kind==='num')return{id:'n'+v,kind,v,glyph:String(v),color:'#ff6b5e',name:'Number '+v};
+  if(kind==='gem')return{id:'g'+v,kind,v,glyph:'◆',color:GEMC[v],name:cap(v)+' gem'};
+  if(kind==='pen')return{id:'p'+v,kind,glyph:'✏️',color:'#fff',name:'Path pen',power:true};
+  if(kind==='compass')return{id:'c'+v,kind,glyph:'🧭',color:'#fff',name:'Guiding light',power:true};return{id:'s'+v,kind,v,glyph:GLY[v],color:'#f2c14e',name:cap(v)}}
+// 13 pairs: one room gives an item, another room needs it
+const PAIRS=[...[3,1,2,4].map(v=>['clock','sudoku',itemOf('num',v)]),...Object.keys(GEMC).map(v=>['lamps','gemdoor',itemOf('gem',v)]),...Object.keys(GLY).map(v=>['stroke','pedestal',itemOf('shape',v)])];
+// 6 stand-alone rooms: solve them on their own, get a power that fits the room
+const SOLO=[0,1,2].map(i=>['stroke',itemOf('pen',i)]).concat([0,1,2].map(i=>['lamps',itemOf('compass',i)]));
+const NAMES={clock:'Clock Room',sudoku:'Sudoku Room',lamps:'Lamp Room',gemdoor:'Gem Door',stroke:'One-Stroke Room',pedestal:'Shape Pedestal'};
+let ENT=[],inv=[],tutDone=false,visitedTut=false,leaveGlow=false;
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+// start: turn every tile's path a random way, keeping only a small patch around the traveller connected
+function jumbleTiles(){let best=null;
+  for(let t=0;t<40;t++){const rots=stickers.map(s=>s.center||s===on?0:Math.floor(Math.random()*4));stickers.forEach((s,i)=>s.rot=rots[i]);
+    let n=0;const seen=new Set([on]),q=[on];while(q.length){const x=q.shift();for(const w of worldExits(x)){const nb=linked(x,w);if(nb&&!seen.has(nb.st)){seen.add(nb.st);q.push(nb.st);n++}}}
+    const score=Math.abs(n-7);if(!best||score<best.score)best={score,rots};if(score<=1)break}
+  stickers.forEach((s,i)=>{s.rot=best.rots[i];s.spin.rotation.z=s.rot*Math.PI/2})}
+// aim for 3–5 entrances reachable at the start (the tutorial room always among them)
+function tuneStart(){const cnt=()=>ENT.filter(e=>e.st===on||bfs(x=>x===e.st)).length;const keep0=stickers.map(s=>s.rot);let best=bfs(x=>x===ENT[0].st)?{score:99,rots:keep0}:null;
+  for(let t=0;t<80;t++){const p=.35+.5*(t%10)/10;const rots=stickers.map(s=>s===on||Math.random()>p?0:Math.floor(Math.random()*4));stickers.forEach((s,i)=>s.rot=rots[i]);
+    if(!bfs(x=>x===ENT[0].st))continue;const n=cnt();const score=n<3?3-n:n>5?n-5:0;if(!best||score<best.score)best={score,rots};if(!score)break}
+  stickers.forEach((s,i)=>s.rot=best?best.rots[i]:keep0[i]);stickers.forEach(s=>s.spin.rotation.z=s.rot*Math.PI/2)}
+function makeEntrances(){
+  // tutorial sudoku: on a tile the traveller can already reach
+  const reach=[];const prev=new Map([[on,0]]),q=[on];while(q.length){const x=q.shift();for(const w of worldExits(x)){const nb=linked(x,w);if(nb&&!prev.has(nb.st)){prev.set(nb.st,prev.get(x)+1);q.push(nb.st);reach.push(nb.st)}}}
+  const cand=reach.filter(s=>s.cubie!==on.cubie).sort((a,b)=>prev.get(b)-prev.get(a));
+  const A=cand.length?cand[Math.floor(Math.random()*Math.min(3,cand.length))]:shuffle(stickers.filter(s=>s.cubie!==on.cubie&&!s.center))[0];
+  const pool=shuffle(cubies.filter(c=>c!==coreCubie&&c!==A.cubie));
+  const pick=c=>{const ss=stickers.filter(s=>s.cubie===c&&s.ex.length);return ss[Math.floor(Math.random()*ss.length)]};
+  ENT=[];PAIRS.forEach(([give,need,item],i)=>{ENT.push({type:need,item,st:i===0?A:pick(pool.pop())});ENT.push({type:give,item,st:pick(pool.pop())})});
+  SOLO.forEach(([type,item])=>ENT.push({type,item,solo:true,st:pick(pool.pop())}));
+  const orig=new Map(ENT.map(e=>[e,e.st.ex.map(x=>x.slice())]));
+  for(let t=0;t<30;t++){ENT.forEach((e,i)=>{if(i){e.st.ex=orig.get(e).map(x=>x.slice());makeEntranceShape(e.st)}});if(bfs(x=>x===ENT[0].st))break}
+  ENT.forEach(e=>{e.dot=makePit();const[ax,ay]=anchorSpin(e.st);e.dot.position.set(ax,ay,0);e.st.spin.add(e.dot)})}
+// an entrance looks like a pit sunk into the path: dark rim, shaft going down, black bottom
+const pitTex=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');const g=x.createRadialGradient(64,64,4,64,64,64);
+  g.addColorStop(0,'#8f88b8');g.addColorStop(.5,'#d9d5ee');g.addColorStop(.85,'#f7f5ff');g.addColorStop(1,'#ffffff');x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)})();
+function makePit(){const g=new THREE.Group();const top=.087,R=.085;
+  const rim=new THREE.Mesh(new THREE.RingGeometry(R,R+.022,40),new THREE.MeshStandardMaterial({color:0xffffff,emissive:0x555555,roughness:.4,side:2}));rim.position.z=top+.002;g.add(rim);
+  const mouth=new THREE.Mesh(new THREE.CircleGeometry(R,40),new THREE.MeshBasicMaterial({map:pitTex}));mouth.position.z=top+.001;g.add(mouth);
+  const glow=new THREE.Mesh(new THREE.RingGeometry(R*.25,R*.45,32),new THREE.MeshBasicMaterial({color:0x8a7cff,transparent:true,opacity:0,depthWrite:false}));glow.position.z=top+.0015;g.add(glow);
+  g.userData={rim,mouth,glow};return g}
+const entAt=st=>ENT.find(e=>e.st===st&&!e.solved);
+const hasItem=id=>inv.some(x=>x.id===id);
+function nextGoal(){if(tutDone)return null;const S=ENT[0],C=ENT[1];if(hasItem('n3'))return S.st;if(visitedTut&&!C.solved)return C.st;return S.st}
+function refreshGoal(){if(where==='surface')setGoal(nextGoal())}
+function markSolved(e){e.solved=true;e.dot.clear();e.dot.userData={};const plate=new THREE.Mesh(new THREE.BoxGeometry(.17,.17,.03),new THREE.MeshStandardMaterial({color:0xffd166,emissive:0x6a4a00}));plate.position.z=.1;e.dot.add(plate);
+  solvedIds.add(e.st.cubie.userData.id);leaveGlow=true;
+  if(e===ENT[0]&&!tutDone){tutDone=true;setTimeout(()=>toast('Tutorial complete!\n24 more rooms — explore freely'),1600)}
+  if(ENT.every(x=>x.solved))setTimeout(()=>toast('ALL 26 ROOMS SOLVED!\nThe core is open'),2400);hud()}
+function giveItem(item){inv.push(item);toast(`You got: ${item.glyph} ${item.name}\nIt's in your bag (bottom-left)`);hud();
+  const el=document.querySelector(`#inv [data-id="${item.id}"]`);if(el){el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),900)}}
+
+// ---------- shared drawing helpers ----------
+function label(text,{bg='#f4f2ec',fg='#1a1a1a',size=300}={}){const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  x.fillStyle=bg;x.fillRect(0,0,256,256);x.fillStyle=fg;x.font=`bold ${size*.6}px Georgia,serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(text,128,138);return new THREE.CanvasTexture(c)}
+function signTex(t){const c=document.createElement('canvas');c.width=512;c.height=128;const x=c.getContext('2d');x.fillStyle='#2a2420';x.fillRect(0,0,512,128);x.fillStyle='#f4e7c8';x.font='bold 44px Georgia';x.textAlign='center';x.fillText(t,256,80);return new THREE.CanvasTexture(c)}
+function sign(t){const m=new THREE.Mesh(new THREE.PlaneGeometry(2.2,.55),new THREE.MeshBasicMaterial({map:signTex(t)}));m.position.set(0,RY+2.05,-1.5*S+.08);roomG.add(m);return m}
+function shapeOf(k,R=.5){const s=new THREE.Shape();
+  if(k==='star'){for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,r=i%2?R*.42:R;i?s.lineTo(Math.cos(a)*r,Math.sin(a)*r):s.moveTo(Math.cos(a)*r,Math.sin(a)*r)}}
+  else if(k==='triangle'){s.moveTo(0,R);s.lineTo(R*.95,-R*.65);s.lineTo(-R*.95,-R*.65)}
+  else if(k==='circle'){s.absarc(0,0,R*.8,0,Math.PI*2)}
+  else{s.moveTo(0,-R*.8);s.bezierCurveTo(R*1.3,-R*.1,R*.7,R*.95,0,R*.4);s.bezierCurveTo(-R*.7,R*.95,-R*1.3,-R*.1,0,-R*.8)}
+  s.closePath();return s}
+const ringM=c=>new THREE.MeshBasicMaterial({color:c,transparent:true,side:2});
+
+// ---------- rooms that GIVE ----------
+function drawClock(ctx,v,taken){ctx.clearRect(0,0,512,512);ctx.fillStyle='#fbf6ea';ctx.beginPath();ctx.arc(256,256,240,0,7);ctx.fill();ctx.lineWidth=14;ctx.strokeStyle='#5a4636';ctx.stroke();
+  const R=['XII','I','II','III','IIII','V','VI','VII','VIII','IX','X','XI'];
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2-Math.PI/2,x=256+Math.cos(a)*180,y=256+Math.sin(a)*180;ctx.textAlign='center';ctx.textBaseline='middle';
+    if(i===v){if(!taken){ctx.fillStyle='#d8352e';ctx.font='bold 72px Arial';ctx.fillText(String(v),x,y)}else{ctx.strokeStyle='#cbbfa8';ctx.lineWidth=3;ctx.setLineDash([6,6]);ctx.strokeRect(x-26,y-30,52,60);ctx.setLineDash([])}}
+    else{ctx.fillStyle='#3a2e24';ctx.font='bold 40px Georgia';ctx.fillText(R[i],x,y)}}
+  ctx.strokeStyle='#3a2e24';ctx.lineCap='round';ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(256,256);ctx.lineTo(256+40,256-90);ctx.stroke();ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(256,256);ctx.lineTo(256-140,256+30);ctx.stroke();
+  ctx.fillStyle='#3a2e24';ctx.beginPath();ctx.arc(256,256,14,0,7);ctx.fill()}
+function buildClock(r,c,e){const sh=shell(1,r,c,'#cfd6e3','#e6ebf3');const v=e.item.v;
+  const cv=document.createElement('canvas');cv.width=cv.height=512;const ctx=cv.getContext('2d');drawClock(ctx,v,e.solved);const tex=new THREE.CanvasTexture(cv);
+  const face=new THREE.Mesh(new THREE.CircleGeometry(1.05,48),new THREE.MeshBasicMaterial({map:tex}));face.position.set(-.35,RY+1.45,-1.5*S+.09);roomG.add(face);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(1.08,.06,10,48),std('#5a4636'));rim.position.copy(face.position);roomG.add(rim);
+  const a=v/12*Math.PI*2-Math.PI/2;const p=face.position.clone().add(V(Math.cos(a)*.74,-Math.sin(a)*.74,.02));
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.2,.26,32),ringM(0xffd166));ring.position.copy(p);roomG.add(ring);ring.visible=!e.solved&&!tutDone;
+  const hit=new THREE.Mesh(new THREE.CircleGeometry(.28,20),new THREE.MeshBasicMaterial({transparent:true,opacity:0}));hit.position.copy(p).add(V(0,0,.01));roomG.add(hit);
+  return{kind:'clock',sh,ctx,tex,ring,hits:[hit,face],p,done:e.solved}}
+function buildLamps(r,c,e){const R=buildRoomA(r,c);R.kind='A';R.type='lamps';const st=[[true,false,false],[false,true,false],[false,false,true]][Math.floor(Math.random()*3)];
+  R.on0=st.slice();R.on=e.solved?[true,true,true]:st.slice();R.done=e.solved;sign('Light all three');
+  const gc=e.item.kind==='gem'?GEMC[e.item.v]:'#ffd166';const gem=new THREE.Mesh(e.item.kind==='gem'?new THREE.OctahedronGeometry(.25):new THREE.SphereGeometry(.2,20,14),std(gc,{emissive:new THREE.Color(gc).multiplyScalar(.5)}));gem.position.copy(roomPos(1,1)).setY(RY+1.1);gem.visible=false;roomG.add(gem);R.gem=gem;return R}
+function buildStroke(r,c,e){const sh=shell(1,r,c,'#e9e6df','#c9d6e8');
+  // a random walk from the middle tile = the shape to draw
+  let path;do{path=[];let cur=[1,1];const seen=new Set(['1,1']);for(let k=0;k<4;k++){const opts=[[0,-1],[1,0],[0,1],[-1,0]].map(([dx,dz])=>[cur[0]+dz,cur[1]+dx]).filter(([i,j])=>i>=0&&i<3&&j>=0&&j<3&&!seen.has(i+','+j));
+      if(!opts.length)break;cur=opts[Math.floor(Math.random()*opts.length)];seen.add(cur.join());path.push(cur.join())}}while(path.length<4);
+  const target=new Set(path);
+  const board=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,.05),std('#f4f2ec'));board.position.set(.75,RY+1.4,-1.5*S+.1);roomG.add(board);
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++){const q=new THREE.Mesh(new THREE.PlaneGeometry(.33,.33),new THREE.MeshBasicMaterial({color:target.has(i+','+j)?0x111111:(i===1&&j===1?0x7fb6ff:0xd8d4cb)}));
+    q.position.set(.75+(j-1)*.37,RY+1.4+(1-i)*.37,-1.5*S+.13);roomG.add(q)}
+  const prize=e.item.kind==='shape'?new THREE.Mesh(new THREE.ExtrudeGeometry(shapeOf(e.item.v,.35),{depth:.08,bevelEnabled:false}),std('#f2c14e',{emissive:0x5a4010})):(()=>{const g=new THREE.Group();const h=new THREE.Mesh(new THREE.CylinderGeometry(.04,.05,.7,10),std('#a9784a'));h.rotation.z=.6;g.add(h);const tip=new THREE.Mesh(new THREE.ConeGeometry(.08,.2,12),std('#e5484d'));tip.position.set(.25,-.35,0);tip.rotation.z=.6+Math.PI;g.add(tip);return g})();prize.position.copy(roomPos(1,1)).setY(RY+1.2);prize.visible=false;roomG.add(prize);
+  return{kind:'B',type:'stroke',sh,target,black:new Set(),prize,done:e.solved}}
+
+// ---------- rooms that NEED ----------
+const SOL=[[1,2,3,4],[3,4,1,2],[2,1,4,3],[4,3,2,1]];
+function buildSudoku(r,c,e){const sh=shell(0,r,c,'#d9c7a8','#efe6d6');sh.floor.forEach(t=>t.visible=false);const v=e.item.v;
+  const spots=[];SOL.forEach((row,i)=>row.forEach((x,j)=>{if(x===v)spots.push([i,j])}));const H=e.hole||(e.hole=spots[Math.floor(Math.random()*spots.length)]);
+  const g=new THREE.Group();g.position.set(0,RY,-.35);roomG.add(g);const s=.66,gap=.06;const cells=[];
+  for(let i=0;i<4;i++)for(let j=0;j<4;j++){const empty=i===H[0]&&j===H[1]&&!e.solved;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(s,.12,s),[0,1,2,3,4,5].map(k=>k===2?new THREE.MeshStandardMaterial({map:empty?label('',{bg:'#fff6c2'}):label(SOL[i][j],i===H[0]&&j===H[1]?{bg:'#c9f2d6',fg:'#1b6b3a'}:{})}):std(empty?'#f2d27a':'#e9e1cf')));
+    m.position.set((j-1.5)*(s+gap)+(j>1?gap:-gap)*.5,.06,(i-1.5)*(s+gap)+(i>1?gap:-gap)*.5);g.add(m);cells.push(m)}
+  const base=new THREE.Mesh(new THREE.BoxGeometry(4*(s+gap)+.2,.05,4*(s+gap)+.2),std('#2a2420'));g.add(base);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.36,.44,4,1),ringM(0xffd166));ring.rotation.set(-Math.PI/2,0,Math.PI/4);ring.position.copy(cells[H[0]*4+H[1]].position).setY(.14);g.add(ring);ring.visible=!e.solved;
+  sign('Fill in 1 – 4');
+  return{kind:'sudoku',sh,cells,ring,H,hits:[cells[H[0]*4+H[1]]],slot:cells[H[0]*4+H[1]],done:e.solved}}
+function buildGemDoor(r,c,e){const sh=shell(0,r,c,'#bfb4a6','#d8cfc2');const col=GEMC[e.item.v];
+  const door=new THREE.Mesh(new THREE.BoxGeometry(1.5,2.1,.12),std('#6b5a4a'));door.position.set(0,RY+1.05,-1.5*S+.1);roomG.add(door);
+  const arch=new THREE.Mesh(new THREE.TorusGeometry(.85,.09,10,32,Math.PI),std('#8a7866'));arch.position.set(0,RY+2.1,-1.5*S+.12);roomG.add(arch);
+  const sock=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.08,6),std('#2a241f'));sock.rotation.x=Math.PI/2;sock.position.set(0,RY+1.3,-1.5*S+.2);roomG.add(sock);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.25,.32,6),ringM(col));ring.position.copy(sock.position).add(V(0,0,.05));roomG.add(ring);
+  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.18),std(col,{emissive:new THREE.Color(col).multiplyScalar(.4)}));gem.position.copy(sock.position).add(V(0,0,.1));gem.visible=!!e.solved;roomG.add(gem);
+  sign('A gem is missing');
+  return{kind:'gemdoor',sh,ring,gem,door,hits:[sock,door],slot:sock,done:e.solved}}
+function buildPedestal(r,c,e){const sh=shell(1,r,c,'#d6cfe6','#e9e4f3');
+  const ped=new THREE.Mesh(new THREE.CylinderGeometry(.55,.65,.9,32),std('#efeaf7'));ped.position.set(0,RY+.45,-.2);roomG.add(ped);
+  const sil=new THREE.Mesh(new THREE.ShapeGeometry(shapeOf(e.item.v,.38)),new THREE.MeshBasicMaterial({color:0x222233}));sil.rotation.x=-Math.PI/2;sil.position.set(0,RY+.905,-.2);roomG.add(sil);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.56,.62,40),ringM(0xffd166));ring.rotation.x=-Math.PI/2;ring.position.set(0,RY+.91,-.2);roomG.add(ring);
+  const prize=new THREE.Mesh(new THREE.ExtrudeGeometry(shapeOf(e.item.v,.38),{depth:.1,bevelEnabled:false}),std('#f2c14e',{emissive:0x5a4010}));prize.rotation.x=-Math.PI/2;prize.position.set(0,RY+.92,-.2);prize.visible=!!e.solved;roomG.add(prize);
+  sign('Something fits here');
+  return{kind:'pedestal',sh,ring,prize,hits:[ped,sil],slot:ped,done:e.solved}}
+
+// ---------- entering / leaving ----------
+async function enterRoom(){const e=entAt(on);if(!e||busy)return;busy=true;act();setGoal(null);
+  const f=frame(on);const p0=player.getWorldPosition(V(0,0,0));scene.attach(player);
+  await tween(.9,k=>{player.position.copy(p0).add(f.N.clone().multiplyScalar(-k*k*1.4));if(k>.5)$('fade').style.opacity=(k-.5)/.5});
+  entry={st:on,a:on.cubie,ent:e};cube.visible=false;clearRoom();const pa=posOf(on.cubie);
+  const B={clock:buildClock,sudoku:buildSudoku,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
+  room=B(pa.z+1,pa.x+1,e);room.ent=e;where='room';
+  if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else{rr=2;rc=1}
+  enterRoomSpace();camSnap();await dropIn();busy=false;leaveGlow=false;hud();
+  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',lamps:'Step on the buttons\nto light all three lamps',
+    stroke:'Draw the shape on the wall\nin one stroke',gemdoor:'This door is missing a gem',pedestal:'Something fits in this pedestal'}[e.type];
+  toast(e.solo?intro+`\nReward: ${e.item.glyph} ${e.item.name}`:intro);
+  if(e===ENT[0]&&!hasItem('n3'))setTimeout(()=>{if(where==='room'&&room.ent===ENT[0]&&!room.done){visitedTut=true;leaveGlow=true;toast("It needs a 3…\nbut you have no 3. Go Up and look for it!");hud()}},2800)}
+async function leaveRooms(){if(busy||where!=='room')return;busy=true;act();
+  const p0=player.position.clone();await Promise.all([tween(.6,k=>player.position.y=p0.y+k*k*3),fade(1,.6)]);
+  clearRoom();where='surface';mode='explore';cube.visible=true;body.rotation.set(0,0,0);standOn(entry.st);faceCamTo(frame(entry.st).N);refreshGoal();camSnap();await fade(0,.5);busy=false;leaveGlow=false;
+  if(goal)toast(goal===on?'Press 3D Puzzle to go back in':'Follow the glowing tile');hud()}
+
+// ---------- in-room actions ----------
+async function tapRoomThing(obj){if(busy)return;act();const e=room.ent;
+  if(room.kind==='clock'){if(room.done){toast('Only Roman numerals left');return}
+    if(obj!==room.hits[0]){toast('Look closely —\none numeral is not like the others');return}
+    room.done=true;drawClock(room.ctx,e.item.v,true);room.tex.needsUpdate=true;room.ring.visible=false;
+    const fly=new THREE.Mesh(new THREE.PlaneGeometry(.5,.5),new THREE.MeshBasicMaterial({map:label(String(e.item.v),{bg:'#fff',fg:'#d8352e'}),transparent:true}));fly.position.copy(room.p);roomG.add(fly);
+    const to=cam.position.clone().lerp(room.p,.6);await tween(.8,k=>{fly.position.lerpVectors(room.p,to,k);fly.lookAt(cam.position);fly.material.opacity=1-k*k});roomG.remove(fly);
+    if(e===ENT[1])visitedTut=true;giveItem(e.item);markSolved(e);return}
+  if(room.done){toast('Already solved');return}
+  const need={sudoku:'Which number fits here?\nTap it in your bag (bottom-left)',gemdoor:'The socket wants a gem.\nTap the right colour in your bag',pedestal:'Find the matching shape\nand tap it in your bag'}[room.kind];
+  if(need)toast(inv.length?need:need.split('\n')[0]+'\nYour bag is empty — find it in another room')}
+let painting=false;
+async function usePower(item){
+  if(item.kind==='compass'){if(where!=='surface'){toast('🧭 Use the guiding light\non the cube surface');return}
+    const open=ENT.filter(x=>!x.solved&&x.st!==on);if(!open.length){toast('No rooms left to find');return}
+    const d=x=>frame(x.st).P.distanceTo(frame(on).P);const t=open.sort((a,b)=>d(a)-d(b))[0];inv=inv.filter(x=>x!==item);setGoal(t.st);
+    toast(`🧭 The nearest unsolved room\nis now glowing`);hud();return}
+  if(item.kind==='pen'){if(where!=='surface'){toast('✏️ Use the pen\non the cube surface');return}
+    painting=item;hud();toast('✏️ Tap a tile to draw\na crossroad on it');}}
+function paintTile(st){if(st.ex.length===4){toast('That tile is already a crossroad');return}
+  makeCross(st);inv=inv.filter(x=>x!==painting);painting=false;
+  const s0=st.spin.scale.clone();tween(.4,k=>st.spin.scale.setScalar(1+Math.sin(k*Math.PI)*.15)).then(()=>st.spin.scale.copy(s0));toast('✏️ Crossroad drawn!');hud();afterChange()}
+async function useItem(item){act();if(busy)return;if(item.power)return usePower(item);
+  if(where!=='room'||!room.slot||room.done){toast(`${item.glyph} ${item.name}\nUse it inside a room that needs it`);return}
+  const e=room.ent;
+  if(item.id!==e.item.id){toast(room.kind==='sudoku'?`${item.glyph} doesn't fit —\ncheck the rows, columns and boxes`:`${item.glyph} doesn't fit here`);
+    const el=document.querySelector(`#inv [data-id="${item.id}"]`);if(el){el.classList.add('shake');setTimeout(()=>el.classList.remove('shake'),500)}return}
+  inv=inv.filter(x=>x!==item);room.done=true;room.ring.visible=false;busy=true;
+  if(room.kind==='sudoku'){const m=room.slot;m.material[2]=new THREE.MeshStandardMaterial({map:label(String(item.v),{bg:'#c9f2d6',fg:'#1b6b3a'})});await tween(.4,k=>m.position.y=.06+Math.sin(k*Math.PI)*.25);toast('SUDOKU COMPLETE!')}
+  if(room.kind==='gemdoor'){room.gem.visible=true;const y0=room.door.position.y;await tween(.9,k=>room.door.position.y=y0+k*2.2);toast('THE DOOR OPENS!')}
+  if(room.kind==='pedestal'){room.prize.visible=true;const y0=room.prize.position.y;await tween(.6,k=>room.prize.position.y=y0+Math.sin(k*Math.PI)*.3);toast('IT FITS!')}
+  busy=false;markSolved(e)}
+
+// ================= camera =================
+let az=35,el=32;const camLook=V(0,0,0);
+function faceCamTo(n){if(Math.abs(n.y)>.5){el=n.y>0?55:-55}else{el=25;az=Math.atan2(n.x,n.z)*180/Math.PI+20}}
+function camGoal(){let tgt,d,e=el;
+  if(where==='surface'){if(mode==='puzzle'){tgt=V(0,0,0);d=8.6}else{tgt=player.getWorldPosition(V(0,0,0));d=5.2}}
+  else if(where==='room'){tgt=V(0,RY+.9,0);d=8.2;e=Math.max(Math.abs(el),42)}else{tgt=V(0,RY+2.2,0);d=8.5;e=Math.max(Math.abs(el),20)}
+  d*=Math.max(1,.75/cam.aspect*.75+.25);const a=az*Math.PI/180,er=e*Math.PI/180;
+  return{tgt,pos:tgt.clone().add(V(Math.sin(a)*Math.cos(er)*d,Math.sin(er)*d,Math.cos(a)*Math.cos(er)*d))}}
+function camSnap(){const g=camGoal();cam.position.copy(g.pos);camLook.copy(g.tgt);cam.lookAt(camLook)}
+function camUpdate(dt){const g=camGoal();cam.position.lerp(g.pos,Math.min(1,dt*6));camLook.lerp(g.tgt,Math.min(1,dt*6));cam.lookAt(camLook)}
+
+// ================= input: tap / hold / swipe =================
+let drag=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function pick(e,objs){const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,cam);return ray.intersectObjects(objs,false)[0]}
+const stickerMeshes=()=>stickers.flatMap(s=>[s.base,s.cover]);
+function toScreen(p){const v=p.clone().project(cam);return new THREE.Vector2((v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight)}
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);
+  const h=where==='surface'?pick(e,stickerMeshes()):null;
+  drag={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false,held:false,turned:false,st:h?h.object.userData.st:null,pt:h?h.point.clone():null};
+  });
+ren.domElement.addEventListener('pointermove',e=>{if(!drag)return;const d=drag;if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>14){d.moved=true;clearTimeout(d.timer)}
+  if(where==='surface'&&mode==='puzzle'&&d.st){// swipe a sticker = turn its row
+    if(!d.moved||d.turned||turning||busy)return;const sw=new THREE.Vector2(e.clientX-d.x,e.clientY-d.y);if(sw.length()<20)return;
+    const n=frame(d.st).N,P=d.pt,s0=toScreen(P);let best=null;
+    AX.forEach(ax=>{if(Math.abs(ax.dot(n))>.5)return;const dd=toScreen(P.clone().add(ax.clone().cross(P).multiplyScalar(.3))).sub(s0);
+      const sc=dd.normalize().dot(sw.clone().normalize());if(!best||Math.abs(sc)>Math.abs(best.sc))best={ax,sc}});
+    if(best&&Math.abs(best.sc)>.5){d.turned=true;act();const mv={ax:best.ax,idx:Math.round(d.st.cubie.position.dot(best.ax)/G),dir:Math.sign(best.sc)};myTurns.push(mv);turn(mv.ax,mv.idx,mv.dir).then(()=>{afterChange();hud()})}return}
+  if(d.moved){az-=(e.clientX-d.lx)*.35;el=Math.max(-80,Math.min(80,el+(e.clientY-d.ly)*.3))}d.lx=e.clientX;d.ly=e.clientY});
+ren.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d)return;clearTimeout(d.timer);if(d.moved||d.held||busy||turning)return;
+  if(where==='surface'&&d.st){painting?paintTile(d.st):mode==='puzzle'?spinTile(d.st):walkTo(d.st)}
+  else if(where==='room'){if(room.hits){const h=pick(e,room.hits);if(h)tapRoomThing(h.object)}else{const h=pick(e,room.sh.floor);if(h){const i=room.sh.floor.indexOf(h.object);tapRoomCell(Math.floor(i/3),i%3)}}}});
+addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();toggleMode();return}const K={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'}[e.key];
+  if(K){e.preventDefault();keyStep(K)}if(e.key==='Enter'&&where==='surface'&&entAt(on))enterRoom();if(e.key==='Escape')leaveRooms()});
+
+// ================= HUD =================
+function setMode(m){if(where!=='surface'||busy||mode===m)return;painting=false;mode=m;if(m==='explore')faceCamTo(frame(on).N);else el=Math.max(el,30);act();hud()}
+function undoTurn(){if(turning||busy)return;const mv=myTurns.pop();if(!mv){toast('Nothing to undo');return}act();turn(mv.ax,mv.idx,-mv.dir).then(()=>{afterChange();hud()})}
+function toggleMode(){if(where!=='surface'||busy)return;painting=false;mode=mode==='explore'?'puzzle':'explore';act();hud()}
+function scramble(n=20){let last=-1;for(let i=0;i<n;i++){let a;do a=Math.floor(Math.random()*3);while(a===last);last=a;turn(AX[a],Math.floor(Math.random()*3)-1,Math.random()<.5?1:-1,0)}}
+function autoSolve(){if(turning||busy||!log.length)return;solving=true;act();const h=log.splice(0);h.reverse().forEach(m=>turn(m.axis,m.idx,-m.dir,.07))}
+function hud(){let help='',stat='';const bb='style="display:inline;font-size:inherit"';const gl=(goal&&where==='surface'?'<br><span style="color:#ffd166">★ Walk to the glowing tile.</span>':'')+(painting?'<br><span style="color:#ff8a7a">✏️ Tap a tile to draw a crossroad.</span>':'');
+  if(where==='surface'){help=mode==='puzzle'?`<b style="color:#f2a33a">PUZZLE MODE</b><i><b ${bb}>Swipe</b> a tile: turn its whole row.<br><b ${bb}>Tap</b> a tile: spin just that tile.</i>`
+      :`<b style="color:#7fe0a8">EXPLORATION MODE</b><i><b ${bb}>Arrow keys</b> or <b ${bb}>tap</b> a tile to walk — paths can wrap round the cube's edges.<br>⚪ pit = a way down into a room · ◼ gold = solved.</i>`;
+    stat=`FACES <span style="color:#1fd6e0">${facesDone} / 6</span>`}
+  else if(where==='room'){const c=entry.a,e=room.ent,nm=`<b style="color:#ffe27a">${NAMES[e.type].toUpperCase()} · ${layerName(c)} ${typeOf(c).toUpperCase()}</b>`;
+    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
+    help=nm+`<i>${room.done?'Solved ✓ — tap Up.':tip}</i>`;stat='INSIDE THE CUBE'}
+  else if(false){const c=entry.a;help=room.kind==='sudoku'?`<b style="color:#ffe27a">SUDOKU ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'Solved!':'Tap the empty square.'}</i>`:`<b style="color:#9fd0ff">CLOCK ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'You took the 3.':'Tap the number that doesn\'t belong.'}</i>`;stat='INSIDE THE CUBE'}
+  else if(where==='room'){const c=room.kind==='A'?entry.a:entry.b;help=room.kind==='A'?`<b style="color:#ffe27a">${layerName(c)} LAYER · ${typeOf(c).toUpperCase()}</b><i>Arrow keys or tap the floor to walk. Light all three lamps.</i>`
+      :`<b style="color:#9fd0ff">${layerName(c)} LAYER · ${typeOf(c).toUpperCase()}</b><i>Arrow keys or tap a tile next to you. Stepped tiles turn black. Draw the wall's shape in one stroke.</i>`;stat='INSIDE THE CUBE'}
+  else{help='<b style="color:#ff9c7a">THE CORE</b><i>The hidden 27th room.</i>';stat='CORE'}
+  $('help').innerHTML=help+gl;$('stat').innerHTML=stat+`<br>ROOMS <span style="color:#f2c14e">${ENT.filter(x=>x.solved).length} / 26</span>`+(where==='surface'&&mode==='puzzle'?'<br><a href="#" id="dbg" style="color:#8a86a8;font-size:10px">dev: auto-solve</a>':'');const dbg=$('dbg');if(dbg)dbg.onclick=ev=>{ev.preventDefault();myTurns.length=0;autoSolve()};
+  const here=where==='core'?'1,1,1':where==='room'?keyOf(entry.a):null;let m='';
+  ['TOP','MID','BOT'].forEach((nm,L)=>{m+=`<div class="lay">${nm}<div class="g">`;for(let r=0;r<3;r++)for(let c=0;c<3;c++){const k=L+','+r+','+c;
+      m+=`<span class="${[solvedAt(k)?'done':'',here===k?'here':'',k==='1,1,1'?'core':''].join(' ')}"></span>`}m+='</div></div>'});$('map').innerHTML=m;
+  const bar0=$('bar');bar0.innerHTML='';const row=document.createElement('div');row.className='row';bar0.appendChild(row);
+  const B=(t,f,id,cls='')=>{const b=document.createElement('button');b.className='b '+cls;if(id)b.id=id;b.innerHTML=t;b.onclick=f;row.appendChild(b);return b};
+  if(where==='surface'){
+    if(entAt(on)&&arrived&&!painting)B('▶ 3D Puzzle',enterRoom,'puzb','go3 pulse');
+    const seg=document.createElement('div');seg.className='seg';row.appendChild(seg);
+    [['puzzle','🧩 Puzzle'],['explore','🚶 Explore']].forEach(([m,t])=>{const b=document.createElement('button');b.className='segb'+(mode===m?' on':'');b.innerHTML=t;b.onclick=()=>setMode(m);if(m!==mode)b.id='modeb';seg.appendChild(b)});
+    if(painting)B('✕ Cancel pen',()=>{painting=false;hud()});
+    else if(mode==='puzzle'){B('↶',undoTurn,'',(myTurns.length?'':'dim ')+'sq').title='Undo';B('◀',()=>{az+=90;act()},'','sq');B('▶',()=>{az-=90;act()},'','sq')}}
+  else if(where==='room'){if(!room.hits&&!room.done)B('⟲ Reset',resetRoom);B('↑ Up',leaveRooms,'leaveb',leaveGlow?'go3 pulse':'')}
+  if(where==='surface'&&ENT.length&&ENT.every(x=>x.solved))B('◉ Enter the Core',()=>{busy=true;fade(1,.5).then(()=>{cube.visible=false;scene.attach(player);body.rotation.set(-Math.PI/2,0,0);toCore()})},'coreb','go3 pulse');
+  const g=$('gest');g.textContent=where==='surface'?(painting?'Tap any tile to draw a crossroad':mode==='puzzle'?'Swipe tile: turn row · Tap: spin tile · ↶ undo · ◀ ▶ look around':'Tap a tile or arrow keys: walk · Drag: look around'):where==='room'?(room.hits?'Tap things in the room · Tap a bag item to use it':'Tap the floor or arrow keys: walk'):'';
+  // bag
+  const iv=$('inv');iv.innerHTML=inv.length?'<div class="ttl">BAG</div>':'<div class="ttl">BAG · empty</div>';
+  inv.forEach(it=>{const d=document.createElement('button');d.className='chip';d.dataset.id=it.id;d.title=it.name;d.innerHTML=`<span style="color:${it.color}">${it.glyph}</span>`;d.onclick=()=>useItem(it);iv.appendChild(d)})}
+function toast(s){const el=$('toast');el.innerHTML=s.replace(/\n/g,'<br><span style="font-size:16px;font-weight:600">');el.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.opacity=0,2000)}
+
+// ================= loop =================
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime,now=performance.now();
+  stickers.forEach(s=>{if(s.black)s.cover.material.emissive.setRGB(.22+.18*Math.sin(t*4),.06+.05*Math.sin(t*4),0)});
+  halo.position.z=.5+Math.sin(t*3)*.03;ENT.forEach((e,i)=>{if(!e.solved&&e.dot.userData.glow)e.dot.userData.glow.material.opacity=.18+.14*Math.sin(t*2+i)});if(beacon.visible){beacon.userData.fr.material.opacity=.6+.4*Math.sin(t*4);beacon.userData.col.material.opacity=.2+.15*Math.sin(t*4)}
+  
+  hintM.material.opacity=hintUntil>now?.55+.35*Math.sin(t*6):Math.max(0,hintM.material.opacity-dt*2);
+  if(room&&room.sh){const cd=V(cam.position.x,0,cam.position.z).normalize();room.sh.walls.forEach(w=>{const vis=w.userData.n.dot(cd)<.35;w.visible=vis;if(w.userData.win){w.userData.win.visible=vis;w.userData.fr.visible=vis}})}
+  if(room&&room.kind==='core')room.holo.rotation.y=t*.4;if(room&&room.ring)room.ring.material.opacity=.55+.45*Math.sin(t*4);
+  camUpdate(dt);ren.render(scene,cam)}
+stickers.forEach(s=>s.homeW=worldExits(s));// remember how every tile is drawn on the finished cube
+scramble(20);queue.push({axis:AX[0],idx:9,dir:0,dur:0,res:()=>{log.length=log.length;standOn(startSticker());setTimeout(()=>started=true,50);faceCamTo(V(0,1,0));camSnap();jumbleTiles();makeEntrances();tuneStart();refreshGoal();hud();setTimeout(()=>toast('Find a way to the glowing tile'),600)}});
+loop();addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
+
+</script>
+</body>
+</html>

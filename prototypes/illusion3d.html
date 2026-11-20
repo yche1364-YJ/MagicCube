@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>錯視解謎世界 3D 預覽</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#1b1d2a;font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#f4f1ea}
+  canvas{display:block;touch-action:none}
+  #bar{position:fixed;top:10px;left:0;right:0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:0 8px;z-index:5}
+  #bar button,#peek{border:0;border-radius:999px;padding:8px 13px;font-size:14px;font-weight:600;background:rgba(255,255,255,.14);color:#f4f1ea;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer}
+  #bar button.on{background:#f4c95d;color:#1b1d2a}
+  #card{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:min(560px,calc(100% - 24px));background:rgba(20,22,34,.78);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px 16px;box-sizing:border-box;z-index:5}
+  #card h2{margin:0 0 4px;font-size:17px}
+  #card p{margin:0;font-size:14px;line-height:1.55;color:#d9d4c9}
+  #peek{display:none;margin-top:10px;background:#e2463f;color:#fff}
+  #hint{position:fixed;top:56px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.5);z-index:4;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="bar">
+  <button data-v="overview" class="on">全景</button>
+  <button data-v="hall">大廳</button>
+  <button data-v="A">A 殘像</button>
+  <button data-v="B">B 視角</button>
+  <button data-v="C">C 透視</button>
+  <button data-v="D">D 樓梯</button>
+</div>
+<div id="hint">拖曳旋轉・雙指縮放</div>
+<div id="card"><h2 id="ct"></h2><p id="cp"></p><button id="peek">👁 站到正確位置</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1d2a);
+scene.fog = new THREE.Fog(0x1b1d2a, 70, 160);
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 400);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI*0.49;
+
+scene.add(new THREE.HemisphereLight(0xfff4e6, 0x3a3a50, 0.55));
+const sun = new THREE.DirectionalLight(0xfff1dc, 0.95);
+sun.position.set(30,55,25); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-55,right:55,top:55,bottom:-55,near:1,far:150});
+scene.add(sun);
+
+const M = (c,o={}) => new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.8},o));
+function box(w,h,d,m,x,y,z,g){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.castShadow=b.receiveShadow=true;g.add(b);return b}
+function rod(a,b,r,m,g){const d=new THREE.Vector3().subVectors(b,a);const c=new THREE.Mesh(new THREE.CylinderGeometry(r,r,d.length(),8),m);c.position.copy(a).add(b).multiplyScalar(.5);c.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());c.castShadow=true;g.add(c);return c}
+function starShape(R,r){const s=new THREE.Shape();for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,rad=i%2?r:R;const x=Math.cos(a)*rad,y=Math.sin(a)*rad;i?s.lineTo(x,y):s.moveTo(x,y)}s.closePath();return s}
+function starPts(R,r){const p=[];for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,rad=i%2?r:R;p.push([Math.cos(a)*rad,Math.sin(a)*rad])}return p}
+function room(ox,oz,S,H,floorC,wallC){const g=new THREE.Group();g.position.set(ox,0,oz);scene.add(g);
+  box(S,.4,S,M(floorC),0,-.2,0,g);box(S,H,.4,M(wallC),0,H/2,-S/2-.2,g);box(.4,H,S,M(wallC),-S/2-.2,H/2,0,g);return g}
+const anim=[];
+
+// ground + paths
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),M(0x262838));ground.rotation.x=-Math.PI/2;ground.position.y=-.45;ground.receiveShadow=true;scene.add(ground);
+function path(x1,z1,x2,z2,c,dash){const n=Math.round(Math.hypot(x2-x1,z2-z1)/1.6);const m=M(c,{emissive:c,emissiveIntensity:.6});
+  for(let i=0;i<=n;i++){if(dash&&i%2)continue;const t=i/n;const b=box(.9,.12,.9,m,x1+(x2-x1)*t,-.38,z1+(z2-z1)*t,scene);b.rotation.y=Math.atan2(x2-x1,z2-z1);}}
+path(-21,-30,21,-30,0xe2463f);       // A→B 紅色濾鏡
+path(30,-21,30,21,0xf4c95d);         // B→C 星形鑰匙
+path(21,30,-21,30,0xb07a45);         // C→D 木板
+path(-30,21,-30,-21,0x9b7bdc,true);  // D→A 秘密通道
+[[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sz])=>path(sx*13,sz*13,sx*21,sz*21,0x8a8478));
+
+// ===== Hall =====
+const hall=room(0,0,24,10,0x8a8178,0xb8ab98);
+box(7,9,.8,M(0x5b4636),0,4.5,-11.6,hall);
+const door=box(5,7.6,.3,M(0x7a5c43,{roughness:.6}),0,3.8,-11.1,hall);
+const slotC=[0xe2463f,0xf4f1ea,0xf4c95d,0x6ad0ff];
+slotC.forEach((c,i)=>{const d=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.15,32),M(c,{emissive:c,emissiveIntensity:.9}));d.rotation.x=Math.PI/2;d.position.set(-1.5+(i%2)*3,5.6-Math.floor(i/2)*1.8,-10.9);hall.add(d);anim.push(t=>d.material.emissiveIntensity=.6+.4*Math.sin(t*2+i))});
+for(let i=0;i<4;i++){const p=new THREE.Mesh(new THREE.PlaneGeometry(4.2,5),new THREE.MeshStandardMaterial({color:slotC[i],transparent:true,opacity:.18,side:2,emissive:slotC[i],emissiveIntensity:.3}));p.position.set(0,4.2,-8.5+i*.9);hall.add(p);anim.push(t=>p.position.y=4.2+Math.sin(t+i)*.15)}
+[[-9,-9],[9,-9],[-9,9]].forEach(([x,z])=>{box(1.4,10,1.4,M(0xa0937f),x,5,z,hall)});
+function portal(x,z,ry,c,g){const f=new THREE.Group();f.position.set(x,0,z);f.rotation.y=ry;g.add(f);
+  box(.6,6,.6,M(0x5b4636),-1.8,3,0,f);box(.6,6,.6,M(0x5b4636),1.8,3,0,f);box(4.2,.6,.6,M(0x5b4636),0,6,0,f);
+  const pl=new THREE.Mesh(new THREE.PlaneGeometry(3,5.7),new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.8,transparent:true,opacity:.75,side:2}));pl.position.y=2.9;f.add(pl);anim.push(t=>pl.material.opacity=.55+.25*Math.sin(t*1.5+x))}
+portal(-11.7,-5,Math.PI/2,0xff6f91,hall);portal(-11.7,5,Math.PI/2,0x9b7bdc,hall);
+portal(7,-11.7,0,0xeeeeee,hall);portal(-7,-11.7,0,0xf4c95d,hall);
+const torch=new THREE.PointLight(0xffb066,1.2,28);torch.position.set(0,7,-6);hall.add(torch);
+
+// ===== A 殘像之室 =====
+const A=room(-30,-30,16,8,0xdedede,0xf2f2f2);
+const cv=document.createElement('canvas');cv.width=cv.height=512;const x=cv.getContext('2d');
+x.fillStyle='#fff';x.fillRect(0,0,512,512);
+const gr=x.createRadialGradient(256,240,20,256,240,200);gr.addColorStop(0,'#00e5ff');gr.addColorStop(.6,'#00c26b');gr.addColorStop(1,'rgba(0,194,107,0)');
+x.fillStyle=gr;x.beginPath();x.arc(256,240,200,0,7);x.fill();x.fillStyle='#111';x.beginPath();x.arc(256,240,10,0,7);x.fill();
+x.font='bold 34px sans-serif';x.textAlign='center';x.fillStyle='#555';x.fillText('盯著黑點 10 秒',256,480);
+const art=new THREE.Mesh(new THREE.PlaneGeometry(5,5),new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(cv)}));art.position.set(-2,4.2,-7.95);A.add(art);
+const blobC=[0xff4d6d,0xffb703,0x3a86ff,0x06d6a0,0xc77dff,0xff7b00,0x00b4d8];
+for(let i=0;i<14;i++){const c=blobC[i%7];const s=new THREE.Mesh(new THREE.SphereGeometry(.4+Math.random()*.9,32,24),M(c,{emissive:c,emissiveIntensity:.35,transparent:true,opacity:.82,roughness:.3}));
+  const bx=-5+Math.random()*11,by=1.5+Math.random()*4.5,bz=-5+Math.random()*11;s.position.set(bx,by,bz);s.castShadow=true;A.add(s);anim.push(t=>s.position.y=by+Math.sin(t*.8+i)*.35)}
+const ped=new THREE.Mesh(new THREE.CylinderGeometry(1,1.2,1.6,32),M(0xbdbdbd));ped.position.set(4,.8,-4);ped.castShadow=true;A.add(ped);
+const hole=new THREE.Mesh(new THREE.ShapeGeometry(starShape(.75,.32)),M(0x222222));hole.rotation.x=-Math.PI/2;hole.position.set(4,1.61,-4);A.add(hole);
+box(.15,1.6,.15,M(0x888888),5.5,.8,3,A);
+const filt=box(1.6,1.6,.08,new THREE.MeshStandardMaterial({color:0xff2a2a,transparent:true,opacity:.55,emissive:0xff0000,emissiveIntensity:.3}),5.5,2.2,3,A);
+anim.push(t=>filt.rotation.y=t*.6);
+const arr=new THREE.Group();arr.position.set(-3,.02,3);A.add(arr);
+const am=M(0xcfcfcf);const ab=new THREE.Mesh(new THREE.PlaneGeometry(.6,2.4),am);ab.rotation.x=-Math.PI/2;arr.add(ab);
+const ah=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-.8,0),new THREE.Vector2(.8,0),new THREE.Vector2(0,1.2)])),am);ah.rotation.x=-Math.PI/2;ah.position.z=-1.2;arr.add(ah);arr.rotation.y=-.7;
+
+// ===== B 視角之室 =====
+const B=room(30,-30,16,9,0x111114,0x18181d);
+const grid=new THREE.GridHelper(16,16,0xffffff,0x444444);grid.position.y=.02;B.add(grid);
+const P=new THREE.Vector3(5,4.5,9);           // 正確視點（區域座標）
+const SC=new THREE.Vector3(0,4.5,-6.5);       // 星星所在平面
+const sp=starPts(3,1.25).map(([u,v])=>new THREE.Vector3(SC.x+u,SC.y+v,SC.z));
+const redM=new THREE.MeshStandardMaterial({color:0xff3b3b,emissive:0xff2020,emissiveIntensity:.7});
+for(let i=0;i<10;i++){const a=sp[i],b=sp[(i+1)%10];const t=.3+Math.random()*.65;
+  const a2=P.clone().add(a.clone().sub(P).multiplyScalar(t)),b2=P.clone().add(b.clone().sub(P).multiplyScalar(t));rod(a2,b2,.09*t,redM,B)}
+const whM=M(0xf2f2f2,{emissive:0xffffff,emissiveIntensity:.15});
+for(let i=0;i<16;i++){const a=new THREE.Vector3(-6+Math.random()*12,.3+Math.random()*6,-6+Math.random()*12);const d=new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(.8+Math.random()*1.6);rod(a,a.clone().add(d),.07,whM,B)}
+const eye=new THREE.Mesh(new THREE.TorusGeometry(.5,.06,8,32),M(0xf4c95d,{emissive:0xf4c95d,emissiveIntensity:1}));eye.position.copy(P).setY(.05);eye.rotation.x=-Math.PI/2;B.add(eye);
+
+// ===== C 透視之室 =====
+const C=room(30,30,16,9,0x14141c,0x1c1c28);
+const st=new THREE.Mesh(new THREE.ExtrudeGeometry(starShape(.8,.34),{depth:.25,bevelEnabled:false}),M(0xffd34d,{emissive:0xffc21a,emissiveIntensity:1.6}));
+st.position.set(1,3.2,1);C.add(st);anim.push(t=>{st.rotation.y=t;st.position.y=3.2+Math.sin(t*1.3)*.3});
+const lamp=new THREE.PointLight(0xffc35a,2.2,16,1.6);lamp.position.set(1,3.2,1);lamp.castShadow=true;C.add(lamp);
+function die(s,x,y,z,g){const d=box(s,s,s,M(0xf4f1ea,{roughness:.4}),x,y,z,g);const dm=M(0x111111);const r=s*.09,o=s*.25;
+  const pip=(px,py,pz)=>{const p=new THREE.Mesh(new THREE.SphereGeometry(r,12,8),dm);p.position.set(px,py,pz);d.add(p)};
+  pip(0,0,s/2);[[-o,o],[o,-o]].forEach(([a,b])=>pip(a,b,s/2-.0));[[-o,o],[0,0],[o,-o]].forEach(([a,b])=>pip(s/2,a,b));
+  [[-o,-o],[o,o],[-o,o],[o,-o]].forEach(([a,b])=>pip(a,s/2,b));return d}
+die(4.2,-3.5,2.1,-3.5,C);die(.6,4.5,.3,5,C);
+box(1.6,.12,.4,M(0xb07a45),2.5,.06,5.5,C);
+
+// ===== D 無限樓梯之室 =====
+const D=room(-30,30,16,10,0x3d3458,0x5a4b82);
+const stepM=M(0xd9cfe8),gap=[19,20,21];const N=32,half=5;
+for(let i=0;i<N;i++){if(gap.includes(i))continue;const side=Math.floor(i/8),k=(i%8)/8;let sx,sz;
+  if(side===0){sx=-half+k*10;sz=half}else if(side===1){sx=half;sz=half-k*10}else if(side===2){sx=half-k*10;sz=-half}else{sx=-half;sz=-half+k*10}
+  const h=.4+i*.24;box(1.6,h,1.6,stepM,sx,h/2,sz,D)}
+const pl=box(.5,.15,4.2,M(0xb07a45),.0,6.3,-half,D);pl.rotation.y=Math.PI/2;anim.push(t=>pl.position.y=6.3+Math.sin(t*1.4)*.25);
+box(16,.4,6,M(0x5a4b82),0,10,-5.2,D);
+const glow=new THREE.Mesh(new THREE.CircleGeometry(1.2,32),new THREE.MeshBasicMaterial({color:0xfff1c2,side:2}));glow.rotation.x=Math.PI/2;glow.position.set(-5,9.79,-5);D.add(glow);
+const dl=new THREE.PointLight(0xc9b6ff,1.2,20);dl.position.set(0,6,0);D.add(dl);
+
+// ===== views =====
+const V={
+ overview:{p:[48,62,72],t:[0,0,0],h:'錯視解謎世界',d:'中央大廳四周有 4 個錯視房間。地上發光的小路，是道具要帶過去的路線：紅＝濾鏡、金＝星形鑰匙、木色＝木板、紫虛線＝秘密通道。'},
+ hall:{p:[15,12,20],t:[0,3.5,-4],h:'中央大廳｜最終之門',d:'門上有 4 個發光空槽：顏色・形狀・數字・方向。門前飄著四片彩色玻璃，四個答案到齊時，玻璃會疊出最後的圖案。'},
+ A:{p:[-30+13,10,-30+15],t:[-30,2.5,-30],h:'A｜殘像之室',d:'房間裡只有一團團顏色，沒有形狀。牆上的圖案盯著黑點 10 秒再看白牆，會浮現密碼。台座上缺一個星形，角落轉動的是紅色濾鏡，地上還有一個淡淡的箭頭。'},
+ B:{p:[30+13,10,-30+15],t:[30,2.5,-30],h:'B｜視角之室',d:'黑白線條的碎片散在空中，看起來亂七八糟。站到地上金色圓圈的位置看，紅色碎片會拼成一顆星。'},
+ C:{p:[30+13,9,30+15],t:[30,2.5,30],h:'C｜透視之室',d:'漆黑的房間裡，只有星形鑰匙在發光。後面的巨大骰子和前面的小骰子是同一顆，地上那塊小木板可以帶去 D 放大成橋。'},
+ D:{p:[-30+15,13,30+16],t:[-30,4,30],h:'D｜無限樓梯之室',d:'方形樓梯一直往上繞，後面斷了一截，空中飄著要放大的木板。爬到最高處，天花板的光洞通往 A 房的上方。'},
+ peek:{p:[30+5,4.5,-30+9],t:[30,4.5,-30-6.5],h:'B｜站到正確位置',d:'就是這裡！所有紅色碎片剛好對齊成一顆星，這就是「形狀」的答案。轉一下視角，星星就會散開。'}
+};
+const ct=document.getElementById('ct'),cp=document.getElementById('cp'),peek=document.getElementById('peek');
+let from=null,to=null,tt=1;
+function go(k){const v=V[k];from={p:camera.position.clone(),t:controls.target.clone()};to={p:new THREE.Vector3(...v.p),t:new THREE.Vector3(...v.t)};tt=0;
+  ct.textContent=v.h;cp.textContent=v.d;peek.style.display=(k==='B'||k==='peek')?'inline-block':'none';
+  document.querySelectorAll('#bar button').forEach(b=>b.classList.toggle('on',b.dataset.v===k||(k==='peek'&&b.dataset.v==='B')))}
+document.querySelectorAll('#bar button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+peek.onclick=()=>go('peek');
+camera.position.set(...V.overview.p);controls.target.set(...V.overview.t);go('overview');tt=1;
+
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const t=clock.getElapsedTime();anim.forEach(f=>f(t));
+  if(tt<1){tt=Math.min(1,tt+clock.getDelta()*0+0.018);const e=tt<.5?2*tt*tt:1-Math.pow(-2*tt+2,2)/2;
+    camera.position.lerpVectors(from.p,to.p,e);controls.target.lerpVectors(from.t,to.t,e)}
+  controls.update();renderer.render(scene,camera)}
+loop();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>

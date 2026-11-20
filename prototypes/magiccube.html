@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Cube — Web Rebuild</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d0f17;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#eef}
+  canvas{display:block;touch-action:none}
+  #help{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.45);padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.55;max-width:220px}
+  #help b{display:block;font-size:16px;margin-bottom:4px;letter-spacing:.03em}
+  #stat{position:fixed;top:10px;right:12px;text-align:right;font-size:12px;line-height:1.5;font-family:ui-monospace,Menlo,monospace}
+  #bar{position:fixed;left:0;right:0;bottom:14px;display:flex;justify-content:center;align-items:flex-end;gap:10px;padding:0 10px;flex-wrap:wrap}
+  .b{border:0;border-radius:12px;background:rgba(255,255,255,.14);color:#fff;font-size:16px;font-weight:700;min-width:52px;height:52px;padding:0 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .b:active{background:rgba(255,255,255,.3)}
+  .mode{background:#f2a33a;color:#1a1a1a}
+  #pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,52px);gap:6px}
+  #toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);font-size:34px;font-weight:800;letter-spacing:.04em;text-shadow:0 2px 20px #000;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center}
+  @media (max-width:520px){#help{font-size:0;padding:6px 10px}#help b{font-size:14px;margin:0}#stat{font-size:10px;top:44px;left:10px;right:auto;text-align:left;background:rgba(0,0,0,.45);padding:6px 10px;border-radius:8px}}
+</style>
+</head>
+<body>
+<div id="help"></div>
+<div id="stat"></div>
+<div id="toast"></div>
+<div id="bar"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ================= scene =================
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0d0f17);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);
+ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(ren.domElement);
+const cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.05,200);
+scene.add(new THREE.HemisphereLight(0xffffff,0x303040,.55));
+const sun=new THREE.DirectionalLight(0xffffff,1.0);sun.position.set(-4,9,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-4,right:4,top:4,bottom:-4,near:1,far:25});scene.add(sun);
+const std=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:new THREE.Color(c),roughness:.55},o));
+const COL={red:'#d63a32',org:'#e8692c',yel:'#e2b53a',grn:'#3fa34d',blu:'#2f55c8',wht:'#e9e6df'};
+const PAL=Object.values(COL);
+
+// ================= cube body =================
+const GAP=1.02,TOP=1.5*GAP;
+const body=new THREE.Group();scene.add(body);
+for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),std('#111216',{roughness:.8}));m.position.set(x*GAP,y*GAP,z*GAP);m.castShadow=m.receiveShadow=true;body.add(m);
+  const st=(nx,ny,nz)=>{const s=new THREE.Mesh(new THREE.BoxGeometry(nx?.02:.88,ny?.02:.88,nz?.02:.88),std(PAL[(x*7+y*5+z*3+nx*2+nz+9)%6]));
+    s.position.set(x*GAP+nx*.51,y*GAP+ny*.51,z*GAP+nz*.51);body.add(s)};
+  if(x===1)st(1,0,0);if(x===-1)st(-1,0,0);if(z===1)st(0,0,1);if(z===-1)st(0,0,-1);if(y===-1)st(0,-1,0)}
+
+// ================= top tiles =================
+// directions: 0=N(-z) 1=E(+x) 2=S(+z) 3=W(-x)
+const DV=[[0,-1],[1,0],[0,1],[-1,0]];
+// level: base colour, exits (unrotated), solution rotation is 0; start rotation scrambles it
+const LEVEL=[
+  [{c:'red',e:[1,2]},           {c:'blu',e:[1,3]},           {c:'yel',e:[2],goal:1,r:2}],
+  [{c:'grn',e:[0,1,2],r:1},     {c:'wht',e:[0,1,2,3]},        {c:'blu',e:[0,2,3],sw:1,r:1}],
+  [{c:'yel',e:[0],start:1,r:1}, {c:'red',e:[0,3],r:2},        {c:'org',e:[0,2],r:1}]];
+// solution: start(2,0)↑ → (1,0) → (1,1) → (1,2) switch → ↑ (0,2) goal. Decoys elsewhere.
+LEVEL[2][0].e=[1];LEVEL[2][1].e=[0,3];LEVEL[1][0].e=[1,2];
+const tiles=[];
+function pathMesh(exits,special){const g=new THREE.Group();const W=.34,H=.05,m=std('#f4f2ec',{emissive:0x222222});
+  const c=new THREE.Mesh(new THREE.BoxGeometry(W,H,W),m);c.position.y=H/2;g.add(c);
+  exits.forEach(d=>{const s=new THREE.Mesh(new THREE.BoxGeometry(d%2?.5-W/2+.01:W,H,d%2?W:.5-W/2+.01),m);
+    const L=(.5+W/2)/2;s.position.set(DV[d][0]*L,H/2,DV[d][1]*L);g.add(s)});
+  g.children.forEach(o=>{o.castShadow=o.receiveShadow=true});return g}
+for(let r=0;r<3;r++)for(let c=0;c<3;c++){const L=LEVEL[r][c];
+  const g=new THREE.Group();g.position.set((c-1)*GAP,TOP,(r-1)*GAP);scene.add(g);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(.94,.06,.94),std(COL[L.c]));base.position.y=.03;base.receiveShadow=true;g.add(base);
+  const p=pathMesh(L.e);p.position.y=.06;g.add(p);
+  const sel=new THREE.Mesh(new THREE.BoxGeometry(.99,.08,.99),new THREE.MeshBasicMaterial({color:0xf2a33a,wireframe:true}));sel.position.y=.04;sel.visible=false;g.add(sel);
+  const t={r,c,g,exits:L.e,rot:L.r||0,vis:L.r||0,sel,start:L.start,sw:L.sw,goal:L.goal,n:r*3+c+1};g.rotation.y=-t.rot*Math.PI/2;tiles.push(t)}
+const T=(r,c)=>tiles.find(t=>t.r===r&&t.c===c);
+const exitsOf=t=>t.exits.map(d=>(d+t.rot)%4);
+
+// switch & goal props
+const swT=tiles.find(t=>t.sw),goT=tiles.find(t=>t.goal),stT=tiles.find(t=>t.start);
+const swBox=new THREE.Mesh(new THREE.BoxGeometry(.3,.12,.3),std('#ff7aa2',{emissive:0x551122}));swBox.position.y=.17;swT.g.add(swBox);
+const swRing=new THREE.Mesh(new THREE.TorusGeometry(.17,.02,8,32),new THREE.MeshBasicMaterial({color:0xff7aa2}));swRing.rotation.x=Math.PI/2;swRing.position.y=.12;swT.g.add(swRing);
+const orb=new THREE.Mesh(new THREE.SphereGeometry(.1,24,16),new THREE.MeshStandardMaterial({color:0x2a5a5a,emissive:0x0a2020}));orb.position.y=.35;goT.g.add(orb);
+const orbLight=new THREE.PointLight(0x5ff0e0,0,3);orbLight.position.y=.4;goT.g.add(orbLight);
+const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,3,16,1,true),new THREE.MeshBasicMaterial({color:0x5ff0e0,transparent:true,opacity:0,side:2,depthWrite:false}));beam.position.y=1.8;goT.g.add(beam);
+
+// player
+const player=new THREE.Group();scene.add(player);
+const pm=std('#3b78c9',{roughness:.35});
+const pb=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.24,20),pm);pb.position.y=.24;player.add(pb);
+[.12,.36].forEach(y=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.13,20,14),pm);s.position.y=y;player.add(s)});
+const halo=new THREE.Mesh(new THREE.SphereGeometry(.045,12,8),new THREE.MeshBasicMaterial({color:0x8affc1}));halo.position.y=.6;player.add(halo);
+player.children.forEach(o=>o.castShadow=true);
+let pr=stT.r,pc=stT.c;const ppos=new THREE.Vector3();
+function cellPos(r,c){return new THREE.Vector3((c-1)*GAP,TOP+.11,(r-1)*GAP)}
+player.position.copy(cellPos(pr,pc));ppos.copy(player.position);
+
+// ================= state / rules =================
+let mode='explore',selected=1,switchOn=false,goalOpen=false,cleared=false;
+function canStep(r,c,d){const a=T(r,c);const nr=r+DV[d][1],nc=c+DV[d][0];if(nr<0||nr>2||nc<0||nc>2)return false;
+  const b=T(nr,nc);return exitsOf(a).includes(d)&&exitsOf(b).includes((d+2)%4)}
+function move(d){if(mode!=='explore'||moving||cleared)return;if(!canStep(pr,pc,d)){bump(d);return}
+  pr+=DV[d][1];pc+=DV[d][0];moving={t:0,from:player.position.clone(),to:cellPos(pr,pc)};player.rotation.y=Math.atan2(DV[d][0],DV[d][1])}
+let moving=null,bumpT=null;function bump(d){bumpT={t:0,d}}
+function arrived(){const t=T(pr,pc);
+  if(t.sw&&!switchOn){switchOn=true;goalOpen=true;toast('SWITCH ON');}
+  if(t.goal&&goalOpen&&!cleared){cleared=true;toast('STAGE CLEAR')}
+  hud()}
+function rotateSel(dir){if(mode!=='puzzle')return;const t=tiles[selected-1];t.rot=(t.rot+dir+4)%4;hud()}
+function resetPos(){pr=stT.r;pc=stT.c;player.position.copy(cellPos(pr,pc));moving=null}
+function resetStage(){tiles.forEach(t=>{const L=LEVEL[t.r][t.c];t.rot=L.r||0});switchOn=goalOpen=cleared=false;resetPos();hud()}
+
+// ================= camera =================
+let az=-35,el=38,zoom=1;
+function camUpdate(dt){const a=az*Math.PI/180,e=el*Math.PI/180;
+  let tgt,d;if(mode==='puzzle'){tgt=new THREE.Vector3(0,.4,0);d=9.5}else{tgt=player.position.clone().add(new THREE.Vector3(0,.2,0));d=4.3}
+  d*=zoom*Math.max(1,.9/cam.aspect*.75+.25);
+  const want=tgt.clone().add(new THREE.Vector3(Math.sin(a)*Math.cos(e)*d,Math.sin(e)*d,Math.cos(a)*Math.cos(e)*d));
+  cam.position.lerp(want,Math.min(1,dt*6));camLook.lerp(tgt,Math.min(1,dt*6));cam.lookAt(camLook)}
+const camLook=new THREE.Vector3();
+// screen-relative direction for WASD / pad: "up" = the grid direction most away from the camera
+function screenDir(k){const f=Math.round(((-az)%360+360)%360/90)%4;// az=0 → camera at +z looking -z → up = N(0)
+  return(k+f)%4}
+
+// ================= input =================
+const keys={};
+addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();toggleMode();return}
+  const k=e.key.toLowerCase();
+  if(k==='w')move(screenDir(0));if(k==='d')move(screenDir(1));if(k==='s')move(screenDir(2));if(k==='a')move(screenDir(3));
+  if(k==='q')rotateSel(-1);if(k==='e')rotateSel(1);
+  if(/^[1-9]$/.test(k)&&mode==='puzzle'){selected=+k;hud()}
+  if(k==='r'){if(e.shiftKey)resetStage();else resetPos()}
+  keys[e.key]=true});
+addEventListener('keyup',e=>keys[e.key]=false);
+let drag=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false}});
+ren.domElement.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.lx,dy=e.clientY-drag.ly;drag.lx=e.clientX;drag.ly=e.clientY;
+  if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>6)drag.moved=true;if(drag.moved){az-=dx*.35;el=Math.max(12,Math.min(80,el+dy*.3))}});
+ren.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d||d.moved||mode!=='puzzle')return;
+  const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,cam);
+  const hit=ray.intersectObjects(tiles.map(t=>t.g),true)[0];if(hit){let o=hit.object;while(o&&!tiles.find(t=>t.g===o))o=o.parent;if(o){selected=tiles.find(t=>t.g===o).n;hud()}}});
+ren.domElement.addEventListener('wheel',e=>{zoom=Math.max(.6,Math.min(1.6,zoom*(1+e.deltaY*.001)))},{passive:true});
+
+// ================= UI =================
+const $=id=>document.getElementById(id);
+function toggleMode(){mode=mode==='explore'?'puzzle':'explore';if(mode==='puzzle'){el=Math.max(el,45)}else el=Math.min(el,40);hud()}
+function hud(){
+  tiles.forEach(t=>t.sel.visible=mode==='puzzle'&&t.n===selected);
+  const t=tiles[selected-1];
+  $('help').innerHTML=mode==='explore'
+    ?'<b style="color:#7fe0a8">EXPLORATION MODE</b>WASD / pad : Move<br>Drag / Arrows : Camera<br>Tab : Puzzle Mode<br>R : Reset Position<br>Shift+R : Reset Stage'
+    :'<b style="color:#f2a33a">PUZZLE MODE</b>1–9 / Tap : Select Tile<br>Q / E : Rotate 90°<br>Drag / Arrows : Camera<br>Tab : Exploration Mode<br>Shift+R : Reset Stage';
+  $('stat').innerHTML=`SELECTED: ${selected} (R${t.r+1}, C${t.c+1}) ROTATION: ${t.rot*90}°<br>SWITCH: ${switchOn?'<span style="color:#7fe0a8">ON</span>':'LOCKED'}<br>GOAL: ${goalOpen?'<span style="color:#5ff0e0">OPEN</span>':'LOCKED'}`;
+  const bar=$('bar');bar.innerHTML='';
+  const B=(txt,fn,cls='')=>{const b=document.createElement('button');b.className='b '+cls;b.innerHTML=txt;b.onclick=fn;return b};
+  bar.appendChild(B(mode==='explore'?'Puzzle':'Explore',toggleMode,'mode'));
+  if(mode==='puzzle'){bar.appendChild(B('↺',()=>rotateSel(-1)));bar.appendChild(B('↻',()=>rotateSel(1)))}
+  else{const pad=document.createElement('div');pad.id='pad';
+    [['',null],['▲',0],['',null],['◀',3],['▼',2],['▶',1]].forEach(([s,k])=>{if(k===null){pad.appendChild(document.createElement('span'))}else pad.appendChild(B(s,()=>move(screenDir(k))))});bar.appendChild(pad)}
+  bar.appendChild(B('⟲',()=>{if(confirmReset)resetStage();else resetPos()}))}
+let confirmReset=false;
+function toast(s){const el=$('toast');el.textContent=s;el.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.opacity=0,1600)}
+
+// ================= loop =================
+const clock=new THREE.Clock();camLook.set(0,.4,0);
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  if(keys.ArrowLeft)az+=90*dt;if(keys.ArrowRight)az-=90*dt;if(keys.ArrowUp)el=Math.min(80,el+60*dt);if(keys.ArrowDown)el=Math.max(12,el-60*dt);
+  // tile rotation easing
+  tiles.forEach(tl=>{const want=-tl.rot*Math.PI/2;let cur=tl.g.rotation.y;let diff=want-cur;diff=Math.atan2(Math.sin(diff),Math.cos(diff));tl.g.rotation.y=cur+diff*Math.min(1,dt*12);
+    tl.g.position.y=TOP+(tl.sel.visible?.05+Math.sin(t*4)*.01:0)});
+  // player rides its tile
+  const onT=T(pr,pc);
+  if(moving){moving.t=Math.min(1,moving.t+dt/.28);const k=moving.t;player.position.lerpVectors(moving.from,moving.to,k);player.position.y+=Math.sin(k*Math.PI)*.12;
+    if(k>=1){moving=null;arrived()}}
+  else{player.position.y=onT.g.position.y+.11}
+  if(bumpT){bumpT.t+=dt/.25;const s=Math.sin(Math.min(1,bumpT.t)*Math.PI)*.08;const base=cellPos(pr,pc);base.y=player.position.y;player.position.copy(base).add(new THREE.Vector3(DV[bumpT.d][0]*s,0,DV[bumpT.d][1]*s));if(bumpT.t>=1)bumpT=null}
+  halo.position.y=.6+Math.sin(t*3)*.03;
+  swBox.position.y=switchOn?.08:.17;swBox.material.color.set(switchOn?'#7fe0a8':'#ff7aa2');swRing.material.color.set(switchOn?0x7fe0a8:0xff7aa2);
+  orb.material.emissive.set(goalOpen?0x2ff0d8:0x0a2020);orb.position.y=.35+(goalOpen?Math.sin(t*2)*.05:0);orbLight.intensity=goalOpen?1.2:0;
+  beam.material.opacity=goalOpen?(cleared?.5:.18+Math.sin(t*3)*.06):0;
+  camUpdate(dt);ren.render(scene,cam)}
+hud();resetStage();cam.position.set(6,6,8);loop();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>

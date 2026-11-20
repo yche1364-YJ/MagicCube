@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nine Squares Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#faf7f0;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#222}
+  canvas{display:block;touch-action:none}
+  #top{position:fixed;top:12px;left:0;right:0;text-align:center;pointer-events:none;padding:0 14px}
+  #top h1{font-family:Caveat,cursive;font-size:32px;margin:0;font-weight:600}
+  #msg{font-size:15px;margin-top:4px;line-height:1.45;max-width:520px;margin-left:auto;margin-right:auto}
+  #step{display:inline-block;margin-top:6px;font-size:12px;color:#777;letter-spacing:.06em}
+  #bot{position:fixed;bottom:18px;left:0;right:0;display:flex;justify-content:center;gap:8px}
+  .btn{border:2px solid #1a1a1a;background:#fff;border-radius:999px;padding:9px 18px;font-size:15px;font-weight:700;cursor:pointer}
+  .go{background:#e07b2e;border-color:#e07b2e;color:#fff}
+</style>
+</head>
+<body>
+<div id="top">
+  <h1 id="title">nine squares</h1>
+  <div id="msg"></div>
+  <div id="step"></div>
+</div>
+<div id="bot"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =================== setup ===================
+const BG=0xfaf7f0, INK=0x1a1a1a, ORANGE=0xe07b2e;
+const scene=new THREE.Scene();scene.background=new THREE.Color(BG);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);
+ren.outputEncoding=THREE.sRGBEncoding;document.body.appendChild(ren.domElement);
+const cam=new THREE.PerspectiveCamera(6,innerWidth/innerHeight,.02,800);
+scene.add(new THREE.HemisphereLight(0xffffff,0xb8b0a0,.85));
+const sun=new THREE.DirectionalLight(0xffffff,.45);sun.position.set(-3,8,6);scene.add(sun);
+const lam=c=>new THREE.MeshLambertMaterial({color:new THREE.Color(c)});
+const off=m=>{[].concat(m).forEach(x=>Object.assign(x,{polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1}));return m};
+const lineM=c=>new THREE.LineBasicMaterial({color:c});
+const UI={msg:document.getElementById('msg'),step:document.getElementById('step'),bot:document.getElementById('bot'),title:document.getElementById('title')};
+function buttons(list){UI.bot.innerHTML='';list.forEach(([t,f,go])=>{const b=document.createElement('button');b.className='btn'+(go?' go':'');b.textContent=t;b.onclick=f;UI.bot.appendChild(b)})}
+const say=(m,s)=>{UI.msg.textContent=m;if(s!==undefined)UI.step.textContent=s};
+
+// =================== camera ===================
+let visH=8,az=0,el=0;const target=new THREE.Vector3(0,0,0);
+function fit(){const asp=innerWidth/innerHeight;visH=Math.max(8.5,6.4/asp);cam.aspect=asp;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)}
+const dist=f=>visH/2/Math.tan(f*Math.PI/360);
+function placeCam(){const d=dist(cam.fov),a=az*Math.PI/180,e=el*Math.PI/180;
+  cam.position.set(target.x+Math.sin(a)*Math.cos(e)*d,target.y+Math.sin(e)*d,target.z+Math.cos(a)*Math.cos(e)*d);cam.lookAt(target)}
+fit();placeCam();
+
+// =================== cards ===================
+const cards=[];
+for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+  const w=lam('#ffffff'),k=new THREE.MeshBasicMaterial({color:0x1a1a1a});
+  const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,.04),off([w,w,w,w,w,k]));
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),lineM(INK)));
+  const card={mesh:m,pos:new THREE.Vector2(c-1,1-r),home:new THREE.Vector2(c-1,1-r),black:false,flipT:0};
+  m.position.set(card.pos.x,card.pos.y,0);scene.add(m);cards.push(card)}
+function resetCards(){cards.forEach(c=>{c.pos.copy(c.home);c.black=false;c.mesh.visible=true})}
+
+// =================== input ===================
+let phase=1,ptr=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function setRay(e){const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,cam)}
+function planePt(e){setRay(e);const o=ray.ray.origin,d=ray.ray.direction;return o.clone().addScaledVector(d,-o.z/d.z)}
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);
+  ptr={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false,card:null};
+  if(phase===1){setRay(e);const hit=ray.intersectObjects(cards.map(c=>c.mesh),false)[0];
+    if(hit){ptr.card=cards.find(c=>c.mesh===hit.object);const p=planePt(e);ptr.grab=new THREE.Vector2(p.x-ptr.card.pos.x,p.y-ptr.card.pos.y);ptr.start=ptr.card.pos.clone()}}});
+ren.domElement.addEventListener('pointermove',e=>{if(!ptr)return;const dx=e.clientX-ptr.lx,dy=e.clientY-ptr.ly;ptr.lx=e.clientX;ptr.ly=e.clientY;
+  if(Math.hypot(e.clientX-ptr.x,e.clientY-ptr.y)>8)ptr.moved=true;if(!ptr.moved)return;
+  if(phase===1&&ptr.card){const p=planePt(e);ptr.card.drag=new THREE.Vector2(p.x-ptr.grab.x,p.y-ptr.grab.y)}
+  else if(phase===2){az=Math.max(-55,Math.min(55,az-dx*.3));el=Math.max(-20,Math.min(45,el+dy*.3));placeCam();
+    if((Math.abs(az)>10||Math.abs(el)>10)&&!seenDepth){seenDepth=true;say('✨ The openings go deep. Tap one to step inside.')}}
+  else if(phase===3){yaw=Math.max(-85,Math.min(85,yaw+dx*.25));pitch=Math.max(-40,Math.min(50,pitch+dy*.25))}});
+ren.domElement.addEventListener('pointerup',e=>{const p=ptr;ptr=null;if(!p)return;
+  if(phase===1&&p.card){const c=p.card;
+    if(!p.moved){c.black=!c.black;c.flipDir=c.black?1:-1;say(c.black?'Flipped to black — black squares become holes.':'Flipped back to white.')}
+    else{const d=c.drag;c.drag=null;const nx=Math.round(d.x*2)/2,ny=Math.round(d.y*2)/2;
+      const ok=Math.abs(nx)<=3&&Math.abs(ny)<=3&&!cards.some(o=>o!==c&&Math.abs(o.pos.x-nx)<.99&&Math.abs(o.pos.y-ny)<.99);
+      if(ok){c.pos.set(nx,ny);say('Moved. Gaps closed in by cards also become holes.')}else say("Cards can't overlap — it slid back.")}}
+  else if(phase===2&&!p.moved){setRay(e);const hit=ray.intersectObjects(hitMeshes,false)[0];if(hit)enter(hit.object.userData.comp)}});
+
+// =================== openings ===================
+// half-cell grid: cell (i,j) covers x∈[i/2,(i+1)/2], y∈[j/2,(j+1)/2]
+const R=12;const key=(i,j)=>i+','+j;
+function findOpenings(){
+  const solid=new Set(),black=new Set();
+  cards.forEach(c=>{for(let a=0;a<2;a++)for(let b=0;b<2;b++){const i=Math.round((c.pos.x-.5)*2)+a,j=Math.round((c.pos.y-.5)*2)+b;(c.black?black:solid).add(key(i,j))}});
+  const outside=new Set(),st=[];
+  for(let i=-R;i<R;i++)for(let j=-R;j<R;j++)if(i===-R||j===-R||i===R-1||j===R-1){const k=key(i,j);if(!solid.has(k)&&!black.has(k)){outside.add(k);st.push([i,j])}}
+  while(st.length){const[i,j]=st.pop();[[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,b])=>{const ni=i+a,nj=j+b;if(ni<-R||nj<-R||ni>=R||nj>=R)return;const k=key(ni,nj);
+    if(!outside.has(k)&&!solid.has(k)&&!black.has(k)){outside.add(k);st.push([ni,nj])}})}
+  const hole=new Set(black);
+  for(let i=-R;i<R;i++)for(let j=-R;j<R;j++){const k=key(i,j);if(!solid.has(k)&&!outside.has(k))hole.add(k)}
+  const comps=[],seen=new Set();
+  hole.forEach(k0=>{if(seen.has(k0))return;const cells=[],q=[k0];seen.add(k0);
+    while(q.length){const k=q.pop();cells.push(k.split(',').map(Number));const[i,j]=k.split(',').map(Number);
+      [[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,b])=>{const nk=key(i+a,j+b);if(hole.has(nk)&&!seen.has(nk)){seen.add(nk);q.push(nk)}})}
+    const is=cells.map(c=>c[0]),js=cells.map(c=>c[1]);
+    const box={x0:Math.min(...is)/2,x1:(Math.max(...is)+1)/2,y0:Math.min(...js)/2,y1:(Math.max(...js)+1)/2};
+    const w=box.x1-box.x0,h=box.y1-box.y0,area=cells.length/4;
+    comps.push({cells,set:new Set(cells.map(c=>key(...c))),box,w,h,area,type:classify(w,h,area)})});
+  return comps}
+function classify(w,h,a){if(a<=1)return'mouse';if(h<=1)return'rabbit';if(w<=1.5&&h>=2.5)return'giraffe';if(w<=1.5&&h>=1.5)return'penguin';if(w>=2&&h>=2)return'elephant';return'cat'}
+const HOMES={
+  mouse:{name:'🐭 Mouse House',floor:'#c9a27a',wall:'#fff3e2',cap:'#e8c9a0',H:2.0},
+  rabbit:{name:'🐰 Rabbit Burrow',floor:'#a7825c',wall:'#d9bf9b',cap:'#c9a77d',H:1.5},
+  penguin:{name:'🐧 Penguin House',floor:'#f2f8fc',wall:'#cfe8f7',cap:'#bfe0f5',H:2.2},
+  cat:{name:'🐱 Cat House',floor:'#e7c9a9',wall:'#ffe3d3',cap:'#f6c4ad',H:2.2},
+  giraffe:{name:'🦒 Giraffe House',floor:'#e9d49a',wall:'#fff1c8',cap:'#f3dc8a',H:2.3},
+  elephant:{name:'🐘 Elephant House',floor:'#b9c7b0',wall:'#e3ebe0',cap:'#c9d6c4',H:2.2}};
+
+// =================== building 3D ===================
+let built=new THREE.Group();scene.add(built);let hitMeshes=[],comps=[],seenDepth=false;
+function quadGeo(rects,z){const p=[];rects.forEach(([x0,y0,x1,y1])=>p.push(x0,y0,z,x1,y0,z,x1,y1,z,x0,y0,z,x1,y1,z,x0,y1,z));
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.computeVertexNormals();return g}
+function buildView(){
+  built.clear?built.clear():built.children.slice().forEach(o=>built.remove(o));hitMeshes=[];
+  const L=1.6;
+  // paper with holes
+  const all=new Set();comps.forEach(c=>c.set.forEach(k=>all.add(k)));const rects=[];
+  for(let i=-R;i<R;i++)for(let j=-R;j<R;j++)if(!all.has(key(i,j)))rects.push([i/2,j/2,(i+1)/2,(j+1)/2]);
+  const E=R/2;rects.push([-200,-200,-E,200],[E,-200,200,200],[-E,E,E,200],[-E,-200,E,-E]);
+  built.add(new THREE.Mesh(quadGeo(rects,-.13),new THREE.MeshBasicMaterial({color:BG,side:2})));
+  comps.forEach(c=>{
+    const g=new THREE.Group();built.add(g);c.group=g;c.L=L;const home=HOMES[c.type];
+    const seg=[],pan={floor:[],ceil:[],side:[]};
+    c.cells.forEach(([i,j])=>{const x0=i/2,x1=x0+.5,y0=j/2,y1=y0+.5;
+      if(!c.set.has(key(i,j-1))){seg.push([x0,y0,x1,y0]);pan.floor.push([x0,y0,x1,y0])}
+      if(!c.set.has(key(i,j+1))){seg.push([x0,y1,x1,y1]);pan.ceil.push([x0,y1,x1,y1])}
+      if(!c.set.has(key(i-1,j))){seg.push([x0,y0,x0,y1]);pan.side.push([x0,y0,x0,y1])}
+      if(!c.set.has(key(i+1,j))){seg.push([x1,y0,x1,y1]);pan.side.push([x1,y0,x1,y1])}});
+    const tunnel=(list,col)=>{const p=[];list.forEach(([ax,ay,bx,by])=>p.push(ax,ay,0,bx,by,0,bx,by,-L,ax,ay,0,bx,by,-L,ax,ay,-L));
+      const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(p,3));geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:new THREE.Color(col),side:2})))};
+    tunnel(pan.floor,'#efe4d2');tunnel(pan.ceil,'#f6f1e8');tunnel(pan.side,'#fbf8f2');
+    // orange sketch lines: outline at both ends + depth lines at corners
+    const lp=[];seg.forEach(([ax,ay,bx,by])=>lp.push(ax,ay,.001,bx,by,.001,ax,ay,-L,bx,by,-L));
+    const cnt={};seg.forEach(([ax,ay,bx,by])=>{const d=ax===bx?'v':'h';[[ax,ay],[bx,by]].forEach(v=>{const k=v.join();cnt[k]=cnt[k]||{};cnt[k][d]=1})});
+    Object.entries(cnt).forEach(([k,v])=>{if(v.h&&v.v){const[x,y]=k.split(',').map(Number);lp.push(x,y,0,x,y,-L)}});
+    const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));g.add(new THREE.LineSegments(lg,lineM(ORANGE)));
+    // glowing far end, tinted by whose home it is
+    const caps=c.cells.map(([i,j])=>[i/2,j/2,i/2+.5,j/2+.5]);
+    c.cap=new THREE.Mesh(quadGeo(caps,-L),new THREE.MeshBasicMaterial({color:new THREE.Color(home.cap),side:2}));g.add(c.cap);
+    const hm=new THREE.Mesh(quadGeo(caps,.03),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));hm.userData.comp=c;g.add(hm);hitMeshes.push(hm)})}
+
+// =================== homes ===================
+function makeRoom(c){
+  const home=HOMES[c.type],{box,w,h,L}=c;const H=Math.max(h*home.H,1.4),W=Math.max(w*3,H*1.5),D=Math.max(W,H)*1.9;
+  const cx=(box.x0+box.x1)/2,y0=box.y0,z0=-L;const g=new THREE.Group();c.group.add(g);c.room={H,W,D,cx,y0,z0,g};
+  const S=(geo,col,x,y,z,lines)=>{const m=new THREE.Mesh(geo,off(lam(col)));m.position.set(x,y,z);if(lines)m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo,30),lineM(INK)));g.add(m);return m};
+  const Bx=(a,b,d,col,x,y,z)=>S(new THREE.BoxGeometry(a,b,d),col,x,y+b/2,z,true);
+  // shell
+  Bx(W,.05,D,home.floor,cx,y0-.05,z0-D/2);Bx(W,.05,D,home.wall,cx,y0+H,z0-D/2);
+  Bx(.05,H,D,home.wall,cx-W/2,y0,z0-D/2);Bx(.05,H,D,home.wall,cx+W/2,y0,z0-D/2);Bx(W,H,.05,home.wall,cx,y0,z0-D);
+  // front wall with the opening's shape cut out
+  const rects=[[cx-W/2,y0,box.x0,y0+H],[box.x1,y0,cx+W/2,y0+H],[box.x0,box.y1,box.x1,y0+H]];
+  for(let i=box.x0*2;i<box.x1*2;i++)for(let j=box.y0*2;j<box.y1*2;j++)if(!c.set.has(key(i,j)))rects.push([i/2,j/2,(i+1)/2,(j+1)/2]);
+  g.add(new THREE.Mesh(quadGeo(rects,z0-.01),new THREE.MeshLambertMaterial({color:new THREE.Color(home.wall),side:2})));
+  const lt=new THREE.PointLight(0xfff2dc,.5,D*2);lt.position.set(cx,y0+H*.8,z0-D/2);g.add(lt);
+  // room-local helpers: u = room height, (x,z) as fractions of width/depth
+  const u=H,P=(fx,fz)=>[cx+fx*W/2,z0-fz*D];
+  const sph=(r,col,fx,y,fz,sx=1,sy=1,sz=1)=>{const[x,z]=P(fx,fz);const m=S(new THREE.SphereGeometry(r,20,14),col,x,y0+y,z);m.scale.set(sx,sy,sz);return m};
+  const cyl=(rt,rb,hh,col,fx,y,fz,rz=0,rx=0)=>{const[x,z]=P(fx,fz);const m=S(new THREE.CylinderGeometry(rt,rb,hh,18),col,x,y0+y,z);m.rotation.z=rz;m.rotation.x=rx;return m};
+  const box3=(a,b,d,col,fx,y,fz)=>{const[x,z]=P(fx,fz);return Bx(a,b,d,col,x,y0+y,z)};
+  const anim=[];const bob=(m,amp,sp)=>{const y=m.position.y;anim.push(t=>m.position.y=y+Math.sin(t*sp)*amp)};
+  const A=new THREE.Group();g.add(A);const ap=(fx,fz)=>{const[x,z]=P(fx,fz);A.position.set(x,y0,z)};
+  const a=(geo,col,x,y,z)=>{const m=new THREE.Mesh(geo,lam(col));m.position.set(x,y,z);A.add(m);return m};
+  const T=c.type;
+  if(T==='mouse'){
+    const ch=new THREE.Shape([new THREE.Vector2(0,0),new THREE.Vector2(.5*u,0),new THREE.Vector2(0,.3*u)]);
+    const chm=S(new THREE.ExtrudeGeometry(ch,{depth:.3*u,bevelEnabled:false}),'#f7c948',...[P(.35,.55)[0],y0,P(.35,.55)[1]],true);
+    for(let i=0;i<4;i++)sph(.03*u,'#e0a92a',.42+i*.05,.08*u+i*.04*u,.42);
+    box3(.5*u,.12*u,.3*u,'#d6453b',-.45,0,.6);box3(.18*u,.05*u,.24*u,'#ffffff',-.55,.12*u,.6);
+    cyl(.09*u,.09*u,.2*u,'#7aa6d6',.1,.1*u,.8);cyl(.11*u,.11*u,.02*u,'#c49a6c',.1,.01*u,.8);cyl(.11*u,.11*u,.02*u,'#c49a6c',.1,.19*u,.8);
+    S(new THREE.CircleGeometry(.18*u,24,0,Math.PI),'#5b4636',cx-W*.2,y0+.001,z0-D+.04);
+    ap(0,.4);const sc=u;a(new THREE.SphereGeometry(.09*sc,20,14),'#9aa0a6',0,.08*sc,0).scale.set(1,.85,1.4);
+    a(new THREE.SphereGeometry(.06*sc,20,14),'#9aa0a6',0,.1*sc,.12*sc);
+    [-1,1].forEach(s=>{a(new THREE.CircleGeometry(.04*sc,20),'#f4a7b9',s*.045*sc,.17*sc,.1*sc);a(new THREE.SphereGeometry(.01*sc,8,6),'#111',s*.025*sc,.12*sc,.17*sc)});
+    a(new THREE.SphereGeometry(.012*sc,8,6),'#f08a9c',0,.1*sc,.18*sc);
+    const tl=a(new THREE.CylinderGeometry(.006*sc,.006*sc,.22*sc,6),'#c9a3a9',0,.07*sc,-.2*sc);tl.rotation.x=1.2;bob(A,.01*u,6)}
+  if(T==='rabbit'){
+    for(let i=0;i<3;i++){const cr=cyl(.04*u,.0,.3*u,'#f08a24',.35+i*.12,.06*u,.55+i*.06,Math.PI/2);cr.rotation.y=.4*i;sph(.05*u,'#5fb24a',.35+i*.12-.06,.06*u,.55+i*.06,1.3,.6,1)}
+    sph(.35*u,'#e9cf6e',-.55,0,.7,1.4,.45,1);sph(.12*u,'#7a5a3b',.6,.12*u,.25,1,1,1);
+    ap(-.05,.45);const s=u;a(new THREE.SphereGeometry(.14*s,20,14),'#f7f7f2',0,.14*s,0).scale.set(1,.9,1.2);
+    a(new THREE.SphereGeometry(.09*s,20,14),'#f7f7f2',0,.27*s,.11*s);
+    [-1,1].forEach(k=>{const e=a(new THREE.SphereGeometry(.035*s,12,10),'#f7f7f2',k*.035*s,.43*s,.08*s);e.scale.set(.6,2.6,.5);e.rotation.z=-k*.15;
+      a(new THREE.SphereGeometry(.012*s,8,6),'#222',k*.04*s,.29*s,.19*s)});
+    a(new THREE.SphereGeometry(.05*s,12,10),'#ffffff',0,.14*s,-.17*s);bob(A,.04*u,3)}
+  if(T==='penguin'){
+    const pool=new THREE.Mesh(new THREE.PlaneGeometry(W*.45,D*.3),new THREE.MeshLambertMaterial({color:0x5fb3e8}));pool.rotation.x=-Math.PI/2;
+    pool.position.set(cx+W*.18,y0+.01,z0-D*.65);g.add(pool);
+    for(let i=0;i<4;i++)box3(.25*u,(.15+.08*i)*u,.25*u,'#e6f6ff',-.6+i*.12,0,.75-i*.05);
+    for(let i=0;i<3;i++)sph(.05*u,'#9fb1bd',.1+i*.08,.03*u,.3,1.8,.6,.8);
+    ap(-.1,.45);const s=u;a(new THREE.SphereGeometry(.17*s,22,16),'#1f2533',0,.25*s,0).scale.set(.85,1.4,.8);
+    a(new THREE.SphereGeometry(.13*s,22,16),'#ffffff',0,.23*s,.06*s).scale.set(.8,1.3,.6);
+    a(new THREE.SphereGeometry(.1*s,20,14),'#1f2533',0,.5*s,0);
+    const bk=a(new THREE.ConeGeometry(.03*s,.09*s,10),'#f39a26',0,.49*s,.12*s);bk.rotation.x=Math.PI/2;
+    [-1,1].forEach(k=>{a(new THREE.SphereGeometry(.018*s,8,6),'#fff',k*.04*s,.53*s,.085*s);a(new THREE.SphereGeometry(.04*s,10,8),'#f39a26',k*.06*s,.01*s,.05*s).scale.set(1,.3,1.6);
+      const f=a(new THREE.SphereGeometry(.05*s,10,8),'#1f2533',k*.15*s,.27*s,0);f.scale.set(.3,1.4,.7)});
+    anim.push(t=>A.rotation.z=Math.sin(t*3)*.08)}
+  if(T==='cat'){
+    cyl(.32*u,.32*u,.1*u,'#e98aa8',-.4,.05*u,.55);
+    sph(.1*u,'#d6453b',.45,.1*u,.4);cyl(.07*u,.07*u,.7*u,'#c9a36f',.65,.35*u,.75);box3(.35*u,.05*u,.35*u,'#a9845a',.65,0,.75);
+    box3(.6*u,.35*u,.05*u,'#9ad0e8',0,.4*u,.995);
+    ap(-.4,.55);const s=u;a(new THREE.SphereGeometry(.16*s,20,14),'#f2a541',0,.22*s,0).scale.set(1.3,.8,.9);
+    a(new THREE.SphereGeometry(.11*s,20,14),'#f2a541',.2*s,.33*s,.05*s);
+    [-1,1].forEach(k=>{const e=a(new THREE.ConeGeometry(.04*s,.08*s,4),'#f2a541',.2*s+k*.06*s,.45*s,.05*s);
+      a(new THREE.SphereGeometry(.013*s,8,6),'#222',.25*s+k*.0*s,.35*s,.05*s+k*.05*s)});
+    const tl=a(new THREE.CylinderGeometry(.025*s,.02*s,.3*s,8),'#f2a541',-.25*s,.3*s,0);tl.rotation.z=.6;anim.push(t=>tl.rotation.z=.6+Math.sin(t*2)*.3)}
+  if(T==='giraffe'){
+    [[-.65,.7],[.6,.75],[.7,.35]].forEach(([fx,fz])=>{cyl(.04*u,.06*u,.75*u,'#8a5a35',fx,.375*u,fz);sph(.2*u,'#5fb24a',fx,.8*u,fz,1.2,.8,1.2);sph(.13*u,'#78c45f',fx+.05,.92*u,fz,1,.8,1)});
+    box3(.3*u,.12*u,.15*u,'#c9a36f',.0,.75*u,.97);sph(.08*u,'#e9cf6e',0,.85*u,.95,2,.6,1);
+    ap(-.1,.5);const s=u;const Y='#f3b93c',Bn='#9a5b22';
+    a(new THREE.SphereGeometry(.15*s,20,14),Y,0,.42*s,0).scale.set(1,.75,1.6);
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([i,k])=>a(new THREE.CylinderGeometry(.025*s,.02*s,.36*s,8),Y,i*.08*s,.18*s,k*.16*s));
+    const nk=a(new THREE.CylinderGeometry(.04*s,.06*s,.4*s,10),Y,0,.68*s,.2*s);nk.rotation.x=.45;
+    const hd=a(new THREE.SphereGeometry(.07*s,16,12),Y,0,.86*s,.3*s);hd.scale.set(.9,.9,1.5);
+    [-1,1].forEach(k=>{a(new THREE.CylinderGeometry(.008*s,.008*s,.07*s,6),Bn,k*.03*s,.94*s,.27*s);a(new THREE.SphereGeometry(.014*s,8,6),Bn,k*.03*s,.975*s,.27*s);
+      a(new THREE.SphereGeometry(.012*s,8,6),'#222',k*.055*s,.88*s,.35*s)});
+    [[.1,.45,.05],[-.1,.48,-.1],[.11,.4,-.15],[-.11,.38,.12],[0,.53,.08]].forEach(([x,y,z])=>a(new THREE.SphereGeometry(.03*s,10,8),Bn,x*s,y*s,z*s).scale.set(.5,1,1));
+    anim.push(t=>{nk.rotation.x=.45+Math.sin(t)*.05;hd.position.y=.86*s+Math.sin(t)*.01*s})}
+  if(T==='elephant'){
+    const pool=new THREE.Mesh(new THREE.CircleGeometry(W*.16,32),new THREE.MeshLambertMaterial({color:0x5fb3e8}));pool.rotation.x=-Math.PI/2;
+    const pp=P(.55,.6);pool.position.set(pp[0],y0+.01,pp[1]);g.add(pool);
+    sph(.12*u,'#e5554b',-.6,.12*u,.35);sph(.2*u,'#e9cf6e',-.65,0,.8,1.5,.5,1);
+    ap(-.05,.55);const s=u,G='#9aa3ad';
+    a(new THREE.SphereGeometry(.24*s,22,16),G,0,.42*s,0).scale.set(1,.85,1.3);
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([i,k])=>a(new THREE.CylinderGeometry(.07*s,.07*s,.28*s,10),G,i*.13*s,.14*s,k*.17*s));
+    a(new THREE.SphereGeometry(.15*s,20,14),G,0,.52*s,.3*s);
+    const tr=a(new THREE.CylinderGeometry(.035*s,.05*s,.3*s,10),G,0,.36*s,.42*s);tr.rotation.x=-.25;
+    [-1,1].forEach(k=>{const e=a(new THREE.SphereGeometry(.13*s,16,12),'#8b94a0',k*.16*s,.55*s,.25*s);e.scale.set(.25,1,.9);
+      const tk=a(new THREE.ConeGeometry(.018*s,.12*s,8),'#fffbe9',k*.06*s,.4*s,.42*s);tk.rotation.x=1.9;
+      a(new THREE.SphereGeometry(.015*s,8,6),'#222',k*.07*s,.58*s,.43*s)});
+    anim.push(t=>tr.rotation.x=-.25+Math.sin(t*1.5)*.15)}
+  c.room.anim=anim;
+  return c.room}
+
+// =================== flow ===================
+function toArrange(){phase=1;built.clear?built.clear():0;built.children.slice().forEach(o=>built.remove(o));hitMeshes=[];
+  cards.forEach(c=>c.mesh.visible=true);az=0;el=0;cam.fov=6;cam.updateProjectionMatrix();target.set(0,0,0);placeCam();
+  UI.title.textContent='nine squares';
+  say('Tap a card to flip it (black = hole). Drag a card to move it — whole or half steps.','STEP 1 / 3 · ARRANGE IN 2D');
+  buttons([['Reset',()=>{resetCards();say('Back to the start.')}],['Look from an angle →',toView,true]])}
+function toView(){comps=findOpenings();
+  if(!comps.length){say('No openings yet. Flip a card to black, or leave a gap fully surrounded by cards.');return}
+  phase=2;seenDepth=false;cards.forEach(c=>{if(c.black)c.mesh.visible=false});buildView();
+  const xs=cards.map(c=>c.pos.x),ys=cards.map(c=>c.pos.y);target.set((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2,0);placeCam();
+  say(`Found ${comps.length} opening${comps.length>1?'s':''}. Drag to tilt the view and find the way in.`,'STEP 2 / 3 · FIND THE ENTRANCE');
+  buttons([['← Rearrange',toArrange]])}
+let fly=null,yaw=0,pitch=0,inside=null,endPos=null;
+function enter(c){phase=2.5;buttons([]);say('','STEP 3 / 3 · ENTER');
+  comps.forEach(o=>{if(o.room){o.group.remove(o.room.g);o.room=null}});
+  const rm=makeRoom(c);c.cap.visible=false;inside=c;
+  // pick the opening cell closest to its centre and stand at a fitting height in that column
+  const mx=c.cells.reduce((s,v)=>s+v[0],0)/c.cells.length,my=c.cells.reduce((s,v)=>s+v[1],0)/c.cells.length;
+  const best=c.cells.slice().sort((p,q)=>Math.hypot(p[0]-mx,p[1]-my)-Math.hypot(q[0]-mx,q[1]-my))[0];
+  let jb=best[1],jt=best[1];while(c.set.has(key(best[0],jb-1)))jb--;while(c.set.has(key(best[0],jt+1)))jt++;
+  const ex=best[0]/2+.25,ey=jb/2+((jt-jb+1)/2)*.5;
+  fly={t:0,from:{az,el,tg:target.clone()},oc:new THREE.Vector3(ex,ey,0),ex,ey,rm}}
+function exitHome(){phase=2;cam.fov=6;cam.updateProjectionMatrix();az=20;el=12;target.copy(fly.from.tg);placeCam();UI.title.textContent='nine squares';
+  if(inside){inside.cap.visible=true;inside.group.remove(inside.room.g);inside.room=null;inside=null}
+  say('Tap another opening — a different shape leads to a different home.','STEP 2 / 3 · FIND THE ENTRANCE');buttons([['← Rearrange',toArrange]])}
+
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2,lerp=(a,b,k)=>a+(b-a)*k;
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  cards.forEach(c=>{const tgt=c.drag||c.pos;c.mesh.position.x+=(tgt.x-c.mesh.position.x)*Math.min(1,dt*16);c.mesh.position.y+=(tgt.y-c.mesh.position.y)*Math.min(1,dt*16);
+    c.mesh.position.z=c.drag?.15:0;const want=c.black?Math.PI:0;c.mesh.rotation.y+=(want-c.mesh.rotation.y)*Math.min(1,dt*9);
+    if(Math.abs(want-c.mesh.rotation.y)>.05)c.mesh.position.z=Math.sin(c.mesh.rotation.y)*.3});
+  if(inside&&inside.room)inside.room.anim.forEach(f=>f(t));
+  if(phase===2.5){const f=fly,rm=f.rm;f.t=Math.min(1,f.t+dt/4.8);
+    if(f.t<.35){const k=ease(f.t/.35);az=lerp(f.from.az,6,k);el=lerp(f.from.el,6,k);cam.fov=lerp(6,55,k);cam.updateProjectionMatrix();target.lerpVectors(f.from.tg,f.oc,k);placeCam()}
+    else{const k=ease((f.t-.35)/.65);const d=dist(55),a=6*Math.PI/180;
+      const P0=new THREE.Vector3(f.oc.x+Math.sin(a)*Math.cos(a)*d,f.oc.y+Math.sin(a)*d,Math.cos(a)*Math.cos(a)*d);
+      const P1=new THREE.Vector3(f.ex,f.ey,.5),P2=new THREE.Vector3(f.ex,f.ey,rm.z0-.3);
+      const P3=new THREE.Vector3(rm.cx,rm.y0+rm.H*.5,rm.z0-rm.D*.05);
+      const pos=k<.35?P0.lerp(P1,k/.35):k<.65?P1.lerp(P2,(k-.35)/.3):P2.lerp(P3,(k-.65)/.35);
+      cam.position.copy(pos);cam.lookAt(k<.35?f.oc.clone().lerp(new THREE.Vector3(f.ex,f.ey,-5),k/.35):new THREE.Vector3(lerp(f.ex,rm.cx,Math.max(0,(k-.65)/.35)),lerp(f.ey,rm.y0+rm.H*.3,Math.max(0,(k-.65)/.35)),rm.z0-rm.D))}
+    if(f.t>=1){phase=3;endPos=cam.position.clone();yaw=0;const dv=cam.getWorldDirection(new THREE.Vector3());pitch=Math.asin(dv.y)*180/Math.PI;
+      UI.title.textContent=HOMES[inside.type].name;
+      say(`Opening ${inside.w}×${inside.h} → ${HOMES[inside.type].name.slice(3)}. Drag to look around.`,'STEP 3 / 3 · INSIDE');
+      buttons([['← Back outside',exitHome]])}}
+  if(phase===3){const y=yaw*Math.PI/180,p=pitch*Math.PI/180;cam.position.copy(endPos);
+    cam.lookAt(endPos.x-Math.sin(y)*Math.cos(p)*10,endPos.y+Math.sin(p)*10,endPos.z-Math.cos(y)*Math.cos(p)*10)}
+  ren.render(scene,cam)}
+toArrange();loop();
+addEventListener('resize',()=>{fit();if(phase<2.5)placeCam()});
+</script>
+</body>
+</html>

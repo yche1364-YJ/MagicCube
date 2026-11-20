@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>上色錯視：線稿變 3D 原型</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#faf7f0;font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#222}
+  #gl{position:fixed;inset:0;opacity:0;transition:opacity .4s}
+  #gl canvas{display:block;touch-action:none}
+  #paper{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;box-sizing:border-box;transition:opacity .5s}
+  h1{font-family:Caveat,cursive;font-size:34px;margin:0;font-weight:600}
+  #sub{font-size:14px;color:#666;margin:0;text-align:center}
+  svg{width:min(560px,96vw);height:auto;touch-action:manipulation}
+  svg polygon{stroke:#1a1a1a;stroke-width:3.2;stroke-linejoin:round}
+  svg .face{cursor:pointer}
+  svg .face:hover{filter:brightness(.97)}
+  .lbl{font-family:Caveat,cursive;font-size:22px;fill:#444}
+  #pal{display:grid;grid-template-columns:repeat(4,44px);gap:8px}
+  #pal button{width:44px;height:44px;border-radius:10px;border:2px solid #1a1a1a;cursor:pointer;padding:0}
+  #pal button.on{outline:3px solid #1a1a1a;outline-offset:2px}
+  #tones{display:grid;grid-template-columns:repeat(4,44px);gap:8px;font-size:11px;color:#777;text-align:center}
+  #msg{min-height:44px;font-size:15px;text-align:center;max-width:480px;line-height:1.5}
+  .btn{border:2px solid #1a1a1a;background:#fff;border-radius:999px;padding:9px 18px;font-size:15px;font-weight:700;cursor:pointer}
+  .go{background:#1a1a1a;color:#fff}
+  #row{display:flex;gap:8px}
+  #hud{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(520px,calc(100% - 24px));background:rgba(250,247,240,.92);border:2px solid #1a1a1a;border-radius:16px;padding:12px 16px;box-sizing:border-box;display:none;z-index:5}
+  #hud h2{margin:0 0 4px;font-size:17px}
+  #hud p{margin:0 0 10px;font-size:14px;line-height:1.5;color:#444}
+</style>
+</head>
+<body>
+<div id="gl"></div>
+
+<div id="paper">
+  <h1>optical illusion</h1>
+  <p id="sub">左邊是範例。點右邊圖形的每一面，替它上色，決定它是「凸」還是「凹」。</p>
+  <svg id="svg" viewBox="-210 -125 420 265"></svg>
+  <div id="pal"></div>
+  <div id="tones"><span>亮</span><span></span><span></span><span></span></div>
+  <div id="msg">先選一個顏色，再點右邊的面。</div>
+  <div id="row"><button class="btn" id="reset">重來</button><button class="btn go" id="enter" style="display:none">走進去 →</button></div>
+</div>
+
+<div id="hud"><h2 id="ht"></h2><p id="hp"></p><button class="btn" id="back">↩ 回到線稿</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ---------- 2D 線稿 ----------
+const HUES={紅:['#f6a5a0','#e2463f','#8e1f1a'],藍:['#a9d4f5','#3a86ff','#1d3f8f'],金:['#fde8a6','#f4c95d','#a07818'],灰:['#f4f4f4','#a8a8a8','#4a4a4a']};
+const pal=document.getElementById('pal');let pick=null;
+// 版面：每一列是同一個明暗（亮／中／暗），每一欄是一種顏色
+[0,1,2].forEach(tone=>Object.entries(HUES).forEach(([h,arr])=>{const b=document.createElement('button');b.style.background=arr[tone];b.title=h+['亮','中','暗'][tone];
+  b.onclick=()=>{pick={c:arr[tone],tone};pal.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');say('點右邊圖形的一面來上色。')};pal.appendChild(b)}));
+const tn=document.getElementById('tones');tn.style.display='block';tn.textContent='上排＝亮　中排＝中間　下排＝暗';
+
+const c=Math.cos(Math.PI/6),S=88;
+const P=(x,y,z,ox)=>[ox+(x-z)*c*S,-y*S+(x+z)*.5*S];
+const svg=document.getElementById('svg');const NS='http://www.w3.org/2000/svg';
+function poly(pts,ox,fill,cls){const p=document.createElementNS(NS,'polygon');p.setAttribute('points',pts.map(v=>P(...v,ox).join(',')).join(' '));p.setAttribute('fill',fill);if(cls)p.setAttribute('class',cls);svg.appendChild(p);return p}
+const L=-c*S,R=c*S;
+// 範例：實心方塊（上亮、側暗）
+poly([[0,1,0],[1,1,0],[1,1,1],[0,1,1]],L,HUES.金[0]);
+poly([[0,0,1],[1,0,1],[1,1,1],[0,1,1]],L,HUES.金[1]);
+poly([[1,0,0],[1,1,0],[1,1,1],[1,0,1]],L,HUES.金[2]);
+// 謎題：模稜兩可的角落
+const faces={
+  floor:poly([[0,0,0],[1,0,0],[1,0,1],[0,0,1]],R,'#fff','face'),
+  wallL:poly([[0,0,0],[0,0,1],[0,1,1],[0,1,0]],R,'#fff','face'),
+  wallR:poly([[0,0,0],[1,0,0],[1,1,0],[0,1,0]],R,'#fff','face')};
+const state={};
+const lab=(x,y,t)=>{const e=document.createElementNS(NS,'text');e.setAttribute('x',x);e.setAttribute('y',y);e.setAttribute('class','lbl');e.setAttribute('text-anchor','middle');e.textContent=t;svg.appendChild(e)};
+lab(L,128,'範例：實心方塊');lab(R,128,'換你上色 ↑');
+Object.entries(faces).forEach(([k,el])=>el.addEventListener('click',()=>{if(!pick){say('先從下面選一個顏色喔。');return}el.setAttribute('fill',pick.c);state[k]={...pick};check()}));
+
+const msg=document.getElementById('msg'),enter=document.getElementById('enter');
+function say(t){msg.textContent=t}
+let result=null;
+function check(){enter.style.display='none';result=null;
+  if(!(state.floor&&state.wallL&&state.wallR)){say('繼續塗，三個面都要上色。');return}
+  const f=state.floor.tone,a=state.wallL.tone,b=state.wallR.tone;
+  if(f<Math.min(a,b)){result='room';say('✨ 地板亮、牆壁暗：大腦看到一個「凹進去的房間」！');enter.textContent='走進去 →'}
+  else if(f>Math.max(a,b)){result='cube';say('✨ 底面最暗：它變成一個「懸在空中的方塊」，你正從下面往上看！');enter.textContent='看看它 →'}
+  else{say('🤔 還分不出是凸還是凹。試試讓「下面那一面」跟兩面牆的明暗差多一點。');return}
+  enter.style.display='inline-block'}
+document.getElementById('reset').onclick=()=>{Object.values(faces).forEach(e=>e.setAttribute('fill','#fff'));for(const k in state)delete state[k];check();say('先選一個顏色，再點右邊的面。')};
+
+// ---------- 3D ----------
+const wrap=document.getElementById('gl');
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xfaf7f0);
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,2000);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);
+ren.shadowMap.enabled=true;ren.outputEncoding=THREE.sRGBEncoding;wrap.appendChild(ren.domElement);
+const ctl=new THREE.OrbitControls(cam,ren.domElement);ctl.enableDamping=true;ctl.enabled=false;
+scene.add(new THREE.HemisphereLight(0xffffff,0x888070,.75));
+const sun=new THREE.DirectionalLight(0xffffff,.55);sun.position.set(6,20,9);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+Object.assign(sun.shadow.camera,{left:-15,right:15,top:15,bottom:-15});scene.add(sun);
+let world=new THREE.Group();scene.add(world);const anim=[];
+const col=h=>new THREE.Color(h);
+const flat=h=>new THREE.MeshLambertMaterial({color:col(h)});
+function inked(mesh){const e=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),new THREE.LineBasicMaterial({color:0x1a1a1a}));mesh.add(e);return mesh}
+function box(w,h,d,m,x,y,z){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.castShadow=b.receiveShadow=true;world.add(inked(b));return b}
+function star(R,r){const s=new THREE.Shape();for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,k=i%2?r:R;i?s.lineTo(Math.cos(a)*k,Math.sin(a)*k):s.moveTo(Math.cos(a)*k,Math.sin(a)*k)}return s}
+
+function buildRoom(){
+  const N=10;
+  box(N,.3,N,flat(state.floor.c),N/2,-.15,N/2);
+  box(.3,N,N,flat(state.wallL.c),-.15,N/2,N/2);   // 左牆（x=0）
+  box(N,N,.3,flat(state.wallR.c),N/2,N/2,-.15);   // 右牆（z=0）
+  // 範例方塊也在房間裡
+  const m=[HUES.金[2],HUES.金[1],HUES.金[0],HUES.金[2],HUES.金[1],HUES.金[1]].map(flat);box(2,2,2,m,7.2,1,2.4);
+  // 台座＋發光星星
+  box(1.4,1.4,1.4,flat('#ffffff'),3,.7,3);
+  const s=new THREE.Mesh(new THREE.ExtrudeGeometry(star(.6,.26),{depth:.2,bevelEnabled:false}),new THREE.MeshBasicMaterial({color:0xffc21a}));
+  s.position.set(3,2.4,3);world.add(inked(s));anim.push(t=>{s.rotation.y=t;s.position.y=2.4+Math.sin(t*1.5)*.2});
+  const lt=new THREE.PointLight(0xffc35a,.8,10);lt.position.set(3,2.6,3);world.add(lt);
+  // 左牆上的下一扇門
+  const door=new THREE.Mesh(new THREE.PlaneGeometry(2.4,4),new THREE.MeshBasicMaterial({color:0x1a1a1a}));
+  door.rotation.y=Math.PI/2;door.position.set(.02,2,7);world.add(door);
+  const glow=new THREE.Mesh(new THREE.PlaneGeometry(2,3.6),new THREE.MeshBasicMaterial({color:0x9b7bdc,transparent:true}));
+  glow.rotation.y=Math.PI/2;glow.position.set(.04,2,7);world.add(glow);anim.push(t=>glow.material.opacity=.5+.4*Math.sin(t*2));
+  // 地上的小方塊線稿（下一個謎題的提示）
+  for(let i=0;i<3;i++){const b=box(.8,.8,.8,flat('#ffffff'),6+i*1.1,.4,7.5-i*.4);b.rotation.y=i*.3}
+  return {look:new THREE.Vector3(5,5,5),dir:new THREE.Vector3(1,1,1).normalize(),endPos:new THREE.Vector3(9,4.2,9.5),endT:new THREE.Vector3(2.5,2.4,2.5),
+    h:'你走進了房間！',p:'牆壁和地板就是你剛剛塗的顏色。星星是鑰匙，左牆上的紫色門通往下一關；地上那幾個白色小方塊，就是下一張要上色的線稿。拖曳可以四處看看。'};
+}
+function buildCube(){
+  const N=10,y0=7;
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshLambertMaterial({color:0xe9e3d6}));g.rotation.x=-Math.PI/2;g.receiveShadow=true;world.add(g);
+  // 面順序：+x,-x,+y,-y,+z,-z
+  const m=[state.wallR.c,'#f4f4f4','#f4f4f4',state.floor.c,state.wallL.c,'#f4f4f4'].map(flat);
+  const cb=box(N,N,N,m,0,y0+N/2,0);anim.push(t=>cb.position.y=y0+N/2+Math.sin(t)*.4);
+  for(let i=0;i<5;i++){const s=box(2,.4,2,flat('#ffffff'),-8+i*3.6,1+i*1.4,9-i*1.2)}
+  return {look:new THREE.Vector3(0,y0+N/2,0),dir:new THREE.Vector3(1,-1,1).normalize(),endPos:new THREE.Vector3(22,6,24),endT:new THREE.Vector3(0,7,0),
+    h:'它變成懸空的方塊了！',p:'因為底面最暗，大腦以為你是從下往上看。這個方塊可以當平台，旁邊的白色踏階能爬上去。想走進房間的話，回到線稿重新上色，讓地板最亮。'};
+}
+
+let tr=null,running=false;const clock=new THREE.Clock();
+function start(){
+  world.clear?world.clear():world.children.slice().forEach(o=>world.remove(o));anim.length=0;
+  const r=result==='room'?buildRoom():buildCube();
+  const H=8.5;const f0=3,f1=55,dz0=H/Math.tan(f0*Math.PI/360),dz1=H/Math.tan(f1*Math.PI/360);
+  tr={r,H,f0,f1,dz0,dz1,t:0};ctl.enabled=false;
+  wrap.style.opacity=1;document.getElementById('paper').style.opacity=0;document.getElementById('paper').style.pointerEvents='none';
+  document.getElementById('ht').textContent=r.h;document.getElementById('hp').textContent=r.p;
+  if(!running){running=true;loop()}
+}
+enter.onclick=start;
+document.getElementById('back').onclick=()=>{document.getElementById('hud').style.display='none';wrap.style.opacity=0;const pp=document.getElementById('paper');pp.style.opacity=1;pp.style.pointerEvents='auto';ctl.enabled=false};
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;anim.forEach(f=>f(t));
+  if(tr&&tr.t<1){tr.t=Math.min(1,tr.t+dt/3);const r=tr.r;
+    if(tr.t<.5){ // 推拉變焦：線稿「立」起來
+      const k=ease(tr.t/.5);const fov=tr.f0+(tr.f1-tr.f0)*k;const d=tr.H/Math.tan(fov*Math.PI/360);
+      cam.fov=fov;cam.position.copy(r.look).addScaledVector(r.dir,d);cam.lookAt(r.look);ctl.target.copy(r.look)}
+    else{ // 飛進去
+      const k=ease((tr.t-.5)/.5);const a=r.look.clone().addScaledVector(r.dir,tr.dz1);
+      cam.fov=tr.f1;cam.position.lerpVectors(a,r.endPos,k);ctl.target.lerpVectors(r.look,r.endT,k);cam.lookAt(ctl.target)}
+    cam.updateProjectionMatrix();
+    if(tr.t>=1){ctl.enabled=true;document.getElementById('hud').style.display='block'}}
+  else if(ctl.enabled)ctl.update();
+  ren.render(scene,cam)}
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>

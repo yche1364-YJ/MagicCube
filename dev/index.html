@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Cube · Dev tool</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0d1c;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#eef}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  #head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(0,0,0,.35)}
+  #head a{color:#fff;text-decoration:none;background:rgba(255,255,255,.14);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;white-space:nowrap}
+  #head .t{font:800 12px ui-monospace,Menlo,monospace;color:#ff8f93;letter-spacing:.08em;display:flex;flex-direction:column;line-height:1.25}#head .t small{font:600 11px -apple-system,'Segoe UI',sans-serif;color:#cfcce6;letter-spacing:0}
+  #save{margin-left:auto;font:11px ui-monospace,Menlo,monospace;color:#aab;text-align:right}
+  #main{flex:1;display:flex;flex-direction:column;min-height:0}
+  @media (min-aspect-ratio:1/1){#main{flex-direction:row}}
+  #netbox{position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:6px}
+  @media (min-aspect-ratio:1/1){#netbox{flex:1 1 50%;width:50%}#threebox{flex:1 1 50%;width:50%}}
+  #net{touch-action:none;display:block}
+  #threebox{position:relative;flex:1 1 auto;min-height:0}
+  #three{position:absolute;inset:0}#three canvas{display:block;touch-action:none}
+  #netwrap{position:relative}
+  .pc{position:absolute;color:#dfe0f5;display:flex;flex-direction:column;justify-content:center}
+  .pc h4{margin:0 0 .25em;color:#ffd166;font-size:1.05em;letter-spacing:.03em}
+  .pc table{border-collapse:collapse;width:100%}.pc td,.pc th{padding:.18em .3em;text-align:center;border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap}
+  .pc th{color:#9a9cc0;font-weight:600}.pc td:first-child,.pc th:first-child{text-align:left}.pc tr.tot td{color:#ffd166;font-weight:800;border-bottom:none}
+  .pc .dot{display:inline-block;width:.8em;height:.8em;border-radius:.2em;vertical-align:-.1em;margin-right:.1em}
+  #gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#2a2350,#0b0d1c);padding:20px}
+  #gate form{background:#1d1838;border:1px solid rgba(255,255,255,.16);border-radius:16px;padding:22px 20px;width:100%;max-width:320px;text-align:center}
+  #gate h2{margin:0 0 4px;font:800 14px ui-monospace,Menlo,monospace;color:#ff8f93;letter-spacing:.08em}#gate p{margin:0 0 14px;color:#aab;font-size:13px}
+  #gate input{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:#0f0c22;color:#fff;font-size:16px;text-align:center;letter-spacing:.15em}
+  #gate button{margin-top:10px;width:100%;padding:11px;border:none;border-radius:10px;background:#e0585e;color:#fff;font-weight:800;font-size:14px;cursor:pointer}
+  #gate .err{color:#ff8f93;font-size:12px;min-height:16px;margin-top:8px}#gate a{display:inline-block;margin-top:10px;color:#aab;font-size:12px}
+  body.locked #app{visibility:hidden}
+  #info{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.45;max-width:190px}
+  #info b{color:#ffd166}#info .chips{display:flex;gap:4px;margin-top:4px}#info .chips span{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.35)}
+  #slider{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;font-size:11px;color:#cfcce6;background:rgba(0,0,0,.45);padding:5px 10px;border-radius:999px}
+  #slider input{width:110px}
+  #bar{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:8px 8px 12px;background:rgba(0,0,0,.35)}
+  .b{border:0;border-radius:10px;background:rgba(255,255,255,.14);color:#fff;font-size:13px;font-weight:700;height:40px;padding:0 11px;cursor:pointer}
+  .b.on{background:#e5484d}.b:active{background:rgba(255,255,255,.3)}
+  #toast{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(10,12,20,.88);padding:8px 16px;border-radius:12px;font-weight:700;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9}
+</style>
+</head>
+<body>
+<div id="gate"><form id="gateform" autocomplete="off">
+  <h2>DEV TOOL</h2><p>Still in development — team only.<br>Enter the password to continue.</p>
+  <input id="gatepw" type="password" placeholder="Password" aria-label="Password">
+  <button type="submit">Enter</button><div class="err" id="gateerr"></div><a href="../">← Back to demo</a>
+</form></div>
+<script>
+// Simple dev-only lock. Not real security (static site): it only keeps casual visitors out.
+(function(){const H='5586650db7c3c0ca970106e3ca3f4e68b378d7acb25c2c5507f6e091088e8958',K='mc-dev-ok';
+  const g=document.getElementById('gate'),open=()=>{g.remove();document.body.classList.remove('locked');dispatchEvent(new Event('resize'))};
+  document.body.classList.add('locked');try{if(sessionStorage.getItem(K)===H){open();return}}catch(e){}
+  async function hash(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+  document.getElementById('gateform').onsubmit=async e=>{e.preventDefault();const v=document.getElementById('gatepw').value.trim();
+    if(await hash(v)===H){try{sessionStorage.setItem(K,H)}catch(e){}open()}else{document.getElementById('gateerr').textContent='Wrong password';document.getElementById('gatepw').select()}};
+  document.getElementById('gatepw').focus()})();
+</script>
+<div id="app">
+  <div id="head"><a href="../">← Demo</a><span class="t">DEV TOOL<small>for level design and path tool creative</small></span><span id="save">loading…</span></div>
+  <div id="main">
+    <div id="netbox"><div id="netwrap"><canvas id="net"></canvas>
+      <div class="pc" id="pc1"><h4>Pieces by colours</h4><table>
+        <tr><th>Colours</th><th>Piece</th><th>Count</th><th>Squares</th></tr>
+        <tr><td><span class="dot" style="background:#4fcf8c"></span> 1</td><td>Centre</td><td>6</td><td>6</td></tr>
+        <tr><td><span class="dot" style="background:#4fcf8c"></span><span class="dot" style="background:#ff6b81"></span> 2</td><td>Edge</td><td>12</td><td>24</td></tr>
+        <tr><td><span class="dot" style="background:#4fcf8c"></span><span class="dot" style="background:#ff6b81"></span><span class="dot" style="background:#fff6e6"></span> 3</td><td>Corner</td><td>8</td><td>24</td></tr>
+        <tr><td>0</td><td>Core (hidden)</td><td>1</td><td>0</td></tr>
+        <tr class="tot"><td>Total</td><td></td><td>27</td><td>54</td></tr></table></div>
+      <div class="pc" id="pc2"><h4>By layer</h4><table>
+        <tr><th>Layer</th><th>Corner·3</th><th>Edge·2</th><th>Centre·1</th><th>Core</th></tr>
+        <tr><td>TOP</td><td>4</td><td>4</td><td>1</td><td>–</td></tr>
+        <tr><td>MID</td><td>–</td><td>4</td><td>4</td><td>1</td></tr>
+        <tr><td>BOT</td><td>4</td><td>4</td><td>1</td><td>–</td></tr></table></div>
+    </div></div>
+    <div id="threebox"><div id="three"></div>
+      <div id="info">Tap a square on the map, or a piece here, to see which piece it is.</div>
+      <div id="slider">together <input id="ex" type="range" min="0" max="100" value="60"> apart</div>
+    </div>
+  </div>
+  <div id="bar">
+    <button class="b on" id="t-draw">✏️ Draw</button>
+    <button class="b" id="t-erase">🧽 Erase</button>
+    <button class="b" id="t-pick">👆 Pick piece</button>
+    <button class="b" id="t-size">Line: M</button>
+    <button class="b" id="t-col">Ink: ⬛</button>
+    <button class="b" id="t-undo">↶ Undo</button>
+    <button class="b" id="t-clear">Clear all</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),V=(x,y,z)=>new THREE.Vector3(x,y,z);
+function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.opacity=0,1400)}
+
+// ---------- the cube: same faces, colours and tile coordinates as the game ----------
+const FACES=[
+  {k:'U',name:'Top',   n:V(0,1,0), u:V(1,0,0), v:V(0,0,-1),col:'#fff6e6',net:[3,0]},
+  {k:'L',name:'Left',  n:V(-1,0,0),u:V(0,0,1), v:V(0,1,0), col:'#ff9a45',net:[0,3]},
+  {k:'F',name:'Front', n:V(0,0,1), u:V(1,0,0), v:V(0,1,0), col:'#4fcf8c',net:[3,3]},
+  {k:'R',name:'Right', n:V(1,0,0), u:V(0,0,-1),v:V(0,1,0), col:'#ff6b81',net:[6,3]},
+  {k:'B',name:'Back',  n:V(0,0,-1),u:V(-1,0,0),v:V(0,1,0), col:'#5aa2ff',net:[9,3]},
+  {k:'D',name:'Bottom',n:V(0,-1,0),u:V(1,0,0), v:V(0,0,1), col:'#ffcf3f',net:[3,6]}];
+// a square on the flat map: column = cu+1, row = 1-cv inside its face (u points right, v points up on the map)
+const cellRect=(f,cu,cv)=>[f.net[0]+cu+1,f.net[1]+1-cv];
+const NW=12,NH=9;
+
+// ---------- drawing data: free strokes in map units (one map square = 1) ----------
+let strokes=[];let pen={w:.17,col:'#1d1b27'};
+const SIZES=[['S',.09],['M',.17],['L',.28]],INKS=[['⬛','#1d1b27'],['⬜','#ffffff'],['🟥','#e5484d']];
+
+// ---------- 3D ----------
+const threeEl=$('three');
+const scene=new THREE.Scene();{const c=document.createElement('canvas');c.width=4;c.height=512;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,0,512);g.addColorStop(0,'#0b0d1c');g.addColorStop(.55,'#171a36');g.addColorStop(1,'#2e2550');x.fillStyle=g;x.fillRect(0,0,4,512);scene.background=new THREE.CanvasTexture(c)}
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));threeEl.appendChild(ren.domElement);
+const cam=new THREE.PerspectiveCamera(40,1,.1,200);
+scene.add(new THREE.HemisphereLight(0xfff6ee,0x6a5a9a,.85));const dl=new THREE.DirectionalLight(0xffffff,.45);dl.position.set(5,8,6);scene.add(dl);
+const cubies=[],stickers=[];
+for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+  const c=new THREE.Group();c.userData.p=V(x,y,z);c.userData.faces=[];c.userData.st=[];scene.add(c);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x14131d,roughness:.7}));body.userData.cubie=c;c.add(body);
+  const sel=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1),new THREE.MeshBasicMaterial({color:0xffd166,wireframe:true}));sel.visible=false;c.add(sel);c.userData.sel=sel;
+  const p=V(x,y,z);
+  FACES.forEach(f=>{if(Math.round(p.dot(f.n))!==1)return;const cu=Math.round(p.dot(f.u)),cv=Math.round(p.dot(f.v));
+    const cv2=document.createElement('canvas');cv2.width=cv2.height=160;const tex=new THREE.CanvasTexture(cv2);
+    const base=new THREE.Mesh(new THREE.PlaneGeometry(.92,.92),new THREE.MeshStandardMaterial({map:tex,roughness:.5}));
+    base.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(f.u,f.v,f.n));base.position.copy(f.n).multiplyScalar(.502);c.add(base);
+    const st={f,cu,cv,cubie:c,canvas:cv2,tex,base,rect:cellRect(f,cu,cv)};base.userData.st=st;stickers.push(st);c.userData.faces.push(f);c.userData.st.push(st)});
+  cubies.push(c)}
+// paint one sticker: its colour, then every stroke clipped to its square of the map
+function paintSticker(st){const x=st.canvas.getContext('2d'),S=160;x.setTransform(1,0,0,1,0,0);x.fillStyle=st.f.col;x.fillRect(0,0,S,S);
+  x.save();x.setTransform(S/.92,0,0,S/.92,-(st.rect[0]+.04)*S/.92,-(st.rect[1]+.04)*S/.92);x.lineCap='round';x.lineJoin='round';
+  strokes.forEach(s=>{if(s.pts.length<1)return;x.strokeStyle=s.col;x.lineWidth=s.w;x.beginPath();x.moveTo(s.pts[0][0],s.pts[0][1]);
+    if(s.pts.length===1)x.lineTo(s.pts[0][0]+.001,s.pts[0][1]);s.pts.forEach(q=>x.lineTo(q[0],q[1]));x.stroke()});x.restore();st.tex.needsUpdate=true}
+let dirty=true;const repaint=()=>{dirty=true};
+let ex=.6;function layout(){cubies.forEach(c=>{const p=c.userData.p,s=1.02+ex*.9;c.position.set(p.x*s,p.y*s,p.z*s)})}
+$('ex').oninput=e=>{ex=e.target.value/100;layout()};
+let az=35,el=28,dist=11;function place(){const a=az*Math.PI/180,e=el*Math.PI/180,d=dist*Math.max(1,.9/cam.aspect);cam.position.set(Math.sin(a)*Math.cos(e)*d,Math.sin(e)*d,Math.cos(a)*Math.cos(e)*d);cam.lookAt(0,0,0)}
+
+// ---------- selecting a piece (shows on both views) ----------
+let selected=null;
+function select(c){if(selected)selected.userData.sel.visible=false;selected=c;if(c){c.userData.sel.visible=true;const p=c.userData.p,fs=c.userData.faces;
+  const type=['Core','Centre','Edge','Corner'][fs.length];const layer=p.y===1?'Top':p.y===0?'Middle':'Bottom';
+  $('info').innerHTML=`<b>${type.toUpperCase()}</b> · ${layer} layer<br>${fs.length} colour${fs.length===1?'':'s'}: ${fs.map(f=>f.name).join(', ')}<div class="chips">${fs.map(f=>`<span style="background:${f.col}"></span>`).join('')}</div>`}drawNet()}
+
+// ---------- the flat map (net) ----------
+const net=$('net'),nx=net.getContext('2d');let cell=30,dpr=Math.min(devicePixelRatio,2);
+function sizeAll(){const box=$('netbox'),wide=innerWidth>innerHeight;
+  const availW=wide?innerWidth*.5-16:innerWidth-12,availH=wide?innerHeight-130:Math.min(innerHeight*.42,(innerWidth-12)*NH/NW);
+  cell=Math.max(10,Math.floor(Math.min(availW/NW,availH/NH)));net.style.width=cell*NW+'px';net.style.height=cell*NH+'px';net.width=cell*NW*dpr;net.height=cell*NH*dpr;[['pc2',0],['pc1',6]].forEach(([id,y])=>{const e=$(id);Object.assign(e.style,{left:cell*6.25+'px',top:cell*(y+.1)+'px',width:cell*5.6+'px',height:cell*2.8+'px',fontSize:Math.max(7,cell*.23)+'px'})});
+  const r=threeEl.getBoundingClientRect();ren.setSize(r.width,r.height);cam.aspect=r.width/Math.max(1,r.height);cam.updateProjectionMatrix();place();drawNet()}
+function drawNet(){nx.setTransform(dpr*cell,0,0,dpr*cell,0,0);nx.clearRect(0,0,NW,NH);
+  stickers.forEach(st=>{nx.fillStyle=st.f.col;nx.fillRect(st.rect[0]+.04,st.rect[1]+.04,.92,.92)});
+  // face names, faint inside each face (under the ink)
+  nx.font='bold 0.36px sans-serif';nx.textAlign='center';nx.textBaseline='middle';FACES.forEach(f=>{nx.fillStyle='rgba(0,0,0,.22)';nx.fillText(f.name.toUpperCase(),f.net[0]+1.5,f.net[1]+1.5)});
+  // strokes
+  nx.save();nx.beginPath();stickers.forEach(st=>nx.rect(st.rect[0]+.04,st.rect[1]+.04,.92,.92));nx.clip();
+  nx.lineCap='round';nx.lineJoin='round';strokes.concat(cur?[cur]:[]).forEach(s=>{nx.strokeStyle=s.col;nx.lineWidth=s.w;nx.beginPath();nx.moveTo(s.pts[0][0],s.pts[0][1]);if(s.pts.length===1)nx.lineTo(s.pts[0][0]+.001,s.pts[0][1]);s.pts.forEach(q=>nx.lineTo(q[0],q[1]));nx.stroke()});nx.restore();
+  // face names + selected piece outline
+  if(selected){nx.strokeStyle='#ffd166';nx.lineWidth=.08;selected.userData.st.forEach(st=>nx.strokeRect(st.rect[0]+.04,st.rect[1]+.04,.92,.92))}}
+const netPt=e=>{const r=net.getBoundingClientRect();return[(e.clientX-r.left)/cell,(e.clientY-r.top)/cell]};
+const stAt=([x,y])=>stickers.find(st=>x>=st.rect[0]&&x<st.rect[0]+1&&y>=st.rect[1]&&y<st.rect[1]+1);
+
+// ---------- tools ----------
+let tool='draw',cur=null;
+function setTool(t){tool=t;['draw','erase','pick'].forEach(k=>$('t-'+k).classList.toggle('on',k===t))}
+$('t-draw').onclick=()=>setTool('draw');$('t-erase').onclick=()=>setTool('erase');$('t-pick').onclick=()=>setTool('pick');
+let si=1,ci=0;$('t-size').onclick=()=>{si=(si+1)%3;pen.w=SIZES[si][1];$('t-size').textContent='Line: '+SIZES[si][0]};
+$('t-col').onclick=()=>{ci=(ci+1)%3;pen.col=INKS[ci][1];$('t-col').textContent='Ink: '+INKS[ci][0]};
+$('t-undo').onclick=()=>{if(!strokes.length)return;strokes=strokes.slice(0,-1);changed();toast('Undone')};
+let arm=false;$('t-clear').onclick=()=>{if(!strokes.length)return;if(arm){strokes=[];changed();toast('All cleared');arm=false;$('t-clear').textContent='Clear all'}else{arm=true;$('t-clear').textContent='Tap again';setTimeout(()=>{arm=false;$('t-clear').textContent='Clear all'},2500)}};
+function changed(){repaint();drawNet();save()}
+
+net.addEventListener('pointerdown',e=>{net.setPointerCapture(e.pointerId);const p=netPt(e);
+  if(tool==='pick'){const st=stAt(p);if(st)select(st.cubie);return}
+  if(tool==='draw'){cur={w:pen.w,col:pen.col,pts:[[+p[0].toFixed(3),+p[1].toFixed(3)]]};drawNet()}
+  if(tool==='erase')eraseAt(p)});
+net.addEventListener('pointermove',e=>{const p=netPt(e);
+  if(tool==='draw'&&cur){const l=cur.pts[cur.pts.length-1];if(Math.hypot(p[0]-l[0],p[1]-l[1])>.03){cur.pts.push([+p[0].toFixed(3),+p[1].toFixed(3)]);drawNet();repaint()}}
+  if(tool==='erase'&&e.buttons)eraseAt(p)});
+net.addEventListener('pointerup',()=>{if(cur){if(stAt(cur.pts[0])||cur.pts.some(q=>stAt(q))){strokes=strokes.concat([cur])}cur=null;changed()}});
+function eraseAt(p){const n=strokes.length;strokes=strokes.filter(s=>!s.pts.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<.2+s.w/2));if(strokes.length!==n)changed()}
+
+// 3D: drag to turn, tap a piece to pick it
+let drag=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false}});
+ren.domElement.addEventListener('pointermove',e=>{if(!drag)return;if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>8)drag.moved=true;if(drag.moved){az-=(e.clientX-drag.lx)*.4;el=Math.max(-85,Math.min(85,el+(e.clientY-drag.ly)*.4));place()}drag.lx=e.clientX;drag.ly=e.clientY});
+ren.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d||d.moved)return;const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,cam);
+  const h=ray.intersectObjects(stickers.map(s=>s.base).concat(cubies.map(c=>c.children[0])),false)[0];if(h)select((h.object.userData.st||{}).cubie||h.object.userData.cubie)});
+ren.domElement.addEventListener('wheel',e=>{dist=Math.max(6,Math.min(22,dist*(1+e.deltaY*.001)));place()},{passive:true});
+
+// ---------- shared save for the team (falls back to this browser) ----------
+let db=null,docRef=null,saveT=null,lastSaved='';
+function stat(){const n=strokes.length;$('save').textContent=(db?'saved for your team':'saved on this device')+` · ${n} stroke${n===1?'':'s'}`}
+function save(){stat();clearTimeout(saveT);saveT=setTimeout(async()=>{const s=JSON.stringify(strokes);if(s===lastSaved)return;lastSaved=s;
+  try{if(docRef)await docRef.set({strokes,at:Date.now()});try{localStorage.setItem('cube-net',s)}catch(e){}}catch(e){lastSaved='';toast('Could not save — check your access')}},600)}
+try{const s=localStorage.getItem('cube-net');if(s)strokes=JSON.parse(s)||[]}catch(e){}
+(async()=>{const t=setTimeout(stat,10000);try{const c=window.claude&&await claude.use('db');if(c){db=c;docRef=db.doc('design/net');
+  docRef.onSnapshot(sn=>{clearTimeout(t);const d=sn&&sn.exists&&sn.data();if(d&&Array.isArray(d.strokes)){const s=JSON.stringify(d.strokes);if(s!==JSON.stringify(strokes)&&!cur){strokes=JSON.parse(s);lastSaved=s;repaint();drawNet()}}stat()},()=>stat())}}catch(e){}stat()})();
+
+layout();sizeAll();
+(function loop(){requestAnimationFrame(loop);if(dirty){dirty=false;stickers.forEach(paintSticker)}ren.render(scene,cam)})();
+addEventListener('resize',sizeAll);
+</script>
+</body>
+</html>

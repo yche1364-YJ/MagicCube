@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>九方塊錯視通道 原型</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#faf7f0;font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#222}
+  canvas{display:block;touch-action:none}
+  #top{position:fixed;top:12px;left:0;right:0;text-align:center;pointer-events:none;padding:0 12px}
+  #top h1{font-family:Caveat,cursive;font-size:32px;margin:0;font-weight:600}
+  #msg{font-size:15px;margin-top:4px;line-height:1.5}
+  #step{display:inline-block;margin-top:6px;font-size:12px;color:#777;letter-spacing:.05em}
+  #meter{width:180px;height:6px;border:1.5px solid #1a1a1a;border-radius:6px;margin:8px auto 0;display:none;overflow:hidden}
+  #meter div{height:100%;width:0;background:#9b7bdc;transition:width .1s}
+  #bot{position:fixed;bottom:18px;left:0;right:0;display:flex;justify-content:center;gap:8px}
+  .btn{border:2px solid #1a1a1a;background:#fff;border-radius:999px;padding:9px 18px;font-size:15px;font-weight:700;cursor:pointer}
+  .go{background:#1a1a1a;color:#fff}
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>nine cubes</h1>
+  <div id="msg">把 9 個方塊拖進虛線格子裡</div>
+  <div id="step">步驟 1／3　排列</div>
+  <div id="meter"><div></div></div>
+</div>
+<div id="bot"><button class="btn" id="again">重來</button><button class="btn go" id="pass" style="display:none">穿過通道 →</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== 謎題資料 =====
+// 真正的形狀：一道拱門（立在 z=0 平面）。每塊方塊沿著視角2的方向被推到不同深度，
+// 所以從視角1看是一團散開的圖形（2D 要排的目標），只有轉到視角2時才會對齊成拱門。
+const ARCH=[[0,0,0],[0,1,0],[3,0,0],[3,1,0],[0,2,0],[1,2,0],[2,2,0],[3,2,0],[1,3,0]];
+const HIDE=[[-1,1,1],[1,0,-1],[-1,4,4],[0,4,3],[2,0,-2],[1,2,0],[-1,5,3],[1,4,2],[2,2,-1]];
+const COLORS=['#f6a5a0','#fde8a6','#a9d4f5','#b8e6c9','#d7c4f2','#ffd0a8','#f9c6de','#c9e7f2','#e9e3a0'];
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xfaf7f0);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(innerWidth,innerHeight);
+ren.outputEncoding=THREE.sRGBEncoding;ren.shadowMap.enabled=true;document.body.appendChild(ren.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x9a9080,.65));
+const sun=new THREE.DirectionalLight(0xffffff,.6);sun.position.set(-4,10,6);scene.add(sun);
+
+const v3=(a)=>new THREE.Vector3(a[0]+.5,a[1]+.5,a[2]+.5);
+const cells=HIDE.map(v3);
+const pivot=cells.reduce((s,p)=>s.add(p),new THREE.Vector3()).multiplyScalar(1/9);
+const EL=Math.atan(1/Math.SQRT2);const AZ1=45,AZ2=-45;
+const dirOf=az=>{const a=az*Math.PI/180;return new THREE.Vector3(Math.sin(a)*Math.cos(EL),Math.sin(EL),Math.cos(a)*Math.cos(EL))};
+
+// 正交相機（2D 階段）
+let halfW,halfH,FT,FB;const ortho=new THREE.OrthographicCamera(-1,1,1,-1,.1,400);
+function fit(){const asp=innerWidth/innerHeight;const saved=az;az=AZ1;placeOrtho();
+  const ys=cells.map(c=>toScreen(c)[1]);const maxY=Math.max(...ys),minY=Math.min(...ys);
+  let top=maxY+2.8,bot=minY-1.4-3.4-2.0;let h=top-bot;if(h*asp<11){const nh=11/asp;top+=(nh-h)/2;bot-=(nh-h)/2;h=nh}
+  FT=top;FB=bot;halfH=h/2;halfW=halfH*asp;TRAY=minY-1.4;
+  Object.assign(ortho,{left:-halfW,right:halfW,top:FT,bottom:FB});ortho.updateProjectionMatrix();
+  persp.aspect=asp;persp.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);az=saved;placeOrtho()}
+let TRAY=0;
+const persp=new THREE.PerspectiveCamera(50,1,.05,500);
+let az=AZ1;function placeOrtho(){ortho.position.copy(pivot).addScaledVector(dirOf(az),80);ortho.lookAt(pivot)}
+let cam=ortho;
+
+// 螢幕座標 <-> 世界座標（以 pivot 為畫面中心）
+function basis(){ortho.updateMatrixWorld();const r=new THREE.Vector3().setFromMatrixColumn(ortho.matrixWorld,0),u=new THREE.Vector3().setFromMatrixColumn(ortho.matrixWorld,1);return{r,u,f:dirOf(az)}}
+function toScreen(p){const{r,u}=basis();const d=p.clone().sub(pivot);return[d.dot(r),d.dot(u)]}
+function toWorld(sx,sy,lift){const{r,u,f}=basis();return pivot.clone().addScaledVector(r,sx).addScaledVector(u,sy).addScaledVector(f,lift)}
+fit();
+
+// 虛線格子
+const ghosts=new THREE.Group();scene.add(ghosts);
+cells.forEach(c=>{const g=new THREE.BoxGeometry(1,1,1);const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0x9b7bdc,transparent:true,opacity:.08,depthWrite:false}));m.position.copy(c);ghosts.add(m);
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineDashedMaterial({color:0x8a80a0,dashSize:.12,gapSize:.08}));e.computeLineDistances();e.position.copy(c);ghosts.add(e)});
+
+// 九個方塊
+const cubes=COLORS.map((col,i)=>{const g=new THREE.BoxGeometry(1,1,1);const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:new THREE.Color(col)}));
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x1a1a1a}));m.add(e);m.userData={cell:-1,edge:e};m.castShadow=true;scene.add(m);return m});
+function layoutTray(){cubes.forEach((m,i)=>{const row=i<5?0:1,k=row?i-5:i,n=row?4:5;const sx=(k-(n-1)/2)*2.1,sy=TRAY-(row?3.0:.9);
+  m.userData.cell=-1;m.userData.sx=sx;m.userData.sy=sy;m.position.copy(toWorld(sx,sy,20))})}
+layoutTray();
+
+// 3D 世界（穿過通道後才出現）
+const world=new THREE.Group();world.visible=false;scene.add(world);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshLambertMaterial({color:0xece5d6}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;world.add(floor);
+const glowDoor=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({color:0x9b7bdc,transparent:true,opacity:0,side:2}));glowDoor.position.set(2,1,1.02);scene.add(glowDoor);
+function wbox(x,y,z,s,c){const g=new THREE.BoxGeometry(s,s,s);const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:new THREE.Color(c)}));m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x1a1a1a})));m.position.set(x,y,z);m.castShadow=true;world.add(m);return m}
+for(let i=0;i<10;i++)wbox(4.5+i*.15,.5+i*.6,-6-i*1.3,1,COLORS[i%9]);
+const star=(()=>{const s=new THREE.Shape();for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,k=i%2?.32:.8;i?s.lineTo(Math.cos(a)*k,Math.sin(a)*k):s.moveTo(Math.cos(a)*k,Math.sin(a)*k)}return s})();
+const starM=new THREE.Mesh(new THREE.ExtrudeGeometry(star,{depth:.2,bevelEnabled:false}),new THREE.MeshBasicMaterial({color:0xffc21a}));starM.position.set(6,7.5,-20);world.add(starM);
+for(let i=0;i<14;i++){const a=Math.PI*(1.05+i/14*.9),r=12+Math.random()*10;wbox(2+Math.cos(a)*r,Math.random()*4,-12+Math.sin(a)*r,1+Math.random()*2.5,COLORS[i%9])}
+
+// ===== 互動 =====
+const msg=document.getElementById('msg'),step=document.getElementById('step'),meter=document.getElementById('meter'),bar=meter.firstElementChild,pass=document.getElementById('pass');
+let phase=1,drag=null,lastX=0;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function scr(e){const r=ren.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);return[ndc.x*halfW,FB+(ndc.y+1)/2*(FT-FB)]}
+ren.domElement.addEventListener('pointerdown',e=>{ren.domElement.setPointerCapture(e.pointerId);
+  if(phase===1){scr(e);ray.setFromCamera(ndc,ortho);const hit=ray.intersectObjects(cubes,false)[0];if(hit){drag=hit.object;drag.userData.cell=-1;drag.position.copy(toWorld(...scr(e),25))}}
+  else if(phase===2){drag='rot';lastX=e.clientX}});
+ren.domElement.addEventListener('pointermove',e=>{
+  if(phase===1&&drag){drag.position.copy(toWorld(...scr(e),25))}
+  else if(phase===2&&drag==='rot'){az+=(e.clientX-lastX)*.35;lastX=e.clientX;az=Math.max(-170,Math.min(170,az));placeOrtho();checkAngle()}});
+ren.domElement.addEventListener('pointerup',e=>{
+  if(phase===1&&drag){const[sx,sy]=scr(e);let best=-1,bd=.95;
+    cells.forEach((c,i)=>{if(cubes.some(m=>m.userData.cell===i))return;const[cx,cy]=toScreen(c);const d=Math.hypot(cx-sx,cy-sy);if(d<bd){bd=d;best=i}});
+    if(best>=0){drag.userData.cell=best;drag.position.copy(cells[best])}else{drag.userData.sx=sx;drag.userData.sy=sy;drag.position.copy(toWorld(sx,sy,20))}
+    drag=null;const n=cubes.filter(m=>m.userData.cell>=0).length;
+    if(n===9)toPhase2();else msg.textContent=n?`已經放好 ${n}／9 塊`:'把 9 個方塊拖進虛線格子裡'}
+  else if(phase===2)drag=null});
+
+function toPhase2(){phase=2;ghosts.visible=false;step.textContent='步驟 2／3　找角度';meter.style.display='block';
+  msg.textContent='排好了！但它們其實前後高低都不一樣。左右拖曳畫面旋轉視角，找出隱藏的形狀。'}
+function checkAngle(){const d=Math.abs(az-AZ2);bar.style.width=Math.max(0,100-d)+'%';
+  if(d<3){phase=2.5;az=AZ2;placeOrtho();bar.style.width='100%';found()}else if(d<18)msg.textContent='快到了……再轉一點點';else msg.textContent='左右拖曳畫面旋轉視角，找出隱藏的形狀。'}
+let tSlide=-1;
+function found(){step.textContent='步驟 3／3　通道開啟';msg.textContent='✨ 九個方塊拼成了一道門！錯視變成真的通道了。';tSlide=0;
+  cubes.forEach(m=>m.userData.edge.material.color.set(0x6a4fc0))}
+pass.onclick=()=>{pass.style.display='none';fly()};
+document.getElementById('again').onclick=()=>location.reload();
+
+// 穿過拱門：推拉變焦 → 飛進去
+let tf=-1;let C0;
+function fly(){C0=toWorld(0,(FT+FB)/2,0);phase=3;cam=persp;world.visible=true;ren.shadowMap.needsUpdate=true;sun.castShadow=true;
+  sun.position.set(-6,14,8);sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20});
+  msg.textContent='';step.textContent='';meter.style.display='none';tf=0}
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+const OPEN=new THREE.Vector3(2,1,.5);
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  // 方塊滑回真正的拱門位置（從這個角度看畫面完全不變）
+  if(tSlide>=0&&tSlide<1){tSlide=Math.min(1,tSlide+dt/1.2);const k=ease(tSlide);
+    cubes.forEach(m=>{const i=m.userData.cell;m.position.lerpVectors(cells[i],v3(ARCH[i]),k)});
+    glowDoor.material.opacity=.9*k;if(tSlide>=1)pass.style.display='inline-block'}
+  if(glowDoor.material.opacity>0&&phase<3)glowDoor.material.opacity=.75+.2*Math.sin(t*3);
+  starM.rotation.y=t;
+  if(phase===3&&tf<1){tf=Math.min(1,tf+dt/4.2);const d2=dirOf(AZ2);
+    if(tf<.4){const k=ease(tf/.4);const fov=2+48*k;const D=halfH/Math.tan(fov*Math.PI/360);
+      persp.fov=fov;persp.position.copy(C0).addScaledVector(d2,D);persp.lookAt(C0);persp.updateProjectionMatrix()}
+    else{const k=ease((tf-.4)/.6);const D1=halfH/Math.tan(25*Math.PI/180);const a=C0.clone().addScaledVector(d2,D1);
+      const p1=new THREE.Vector3(2,1,6),p2=new THREE.Vector3(2,1.1,-3);
+      const pos=k<.5?a.clone().lerp(p1,k*2):p1.clone().lerp(p2,(k-.5)*2);
+      const tg=k<.5?C0.clone().lerp(OPEN,k*2):new THREE.Vector3(2+(k-.5)*6,1+(k-.5)*6,-20);
+      persp.position.copy(pos);persp.lookAt(tg);glowDoor.material.opacity=Math.max(0,.9*(1-(k-.4)*4))}
+    if(tf>=1){step.textContent='';msg.textContent='你穿過了錯視通道，來到 3D 世界！方塊樓梯通往遠方的星星。'}}
+  ren.render(scene,cam)}
+loop();
+addEventListener('resize',()=>{fit();if(phase<3){placeOrtho();if(phase===1)cubes.forEach(m=>{if(m.userData.cell<0)m.position.copy(toWorld(m.userData.sx,m.userData.sy,20))})}});
+</script>
+</body>
+</html>
