@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Magic Cube · 54 Entrances</title>
+<title>Magic Cube · White + Blue Prototype</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#0b0d1c;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#eef}
   canvas{display:block;touch-action:none}
@@ -42,19 +42,11 @@
   #hintb{background:#ff7aa2;color:#2a0a14}
   @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(242,163,58,.45)}}.pulse{animation:pulse 1s infinite}
   #panel h2{margin:0 0 6px;font-size:20px;color:#ff9c7a}#panel p{margin:0 0 6px;font-size:14px;line-height:1.5;color:#d8dbea}
-  #sudokuUI{position:fixed;inset:76px 14px 92px;display:none;place-items:center;pointer-events:none;z-index:8}
-  #sudokuCard{pointer-events:auto;width:min(66vh,620px,calc(100vw - 28px));background:rgba(10,12,28,.92);border:1px solid rgba(255,255,255,.18);border-radius:22px;padding:14px;box-sizing:border-box;box-shadow:0 18px 60px rgba(0,0,0,.45)}
-  #sudokuHead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px}
-  #sudokuHead b{font-size:15px;letter-spacing:.08em;color:#fff6e6}#sudokuHead span{font-size:12px;color:#aab3d0;text-align:right}
-  #sudokuGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;background:#15182a;border:5px solid #15182a;border-radius:14px;overflow:hidden}
-  .sCell{aspect-ratio:1;border:0;background:#fff6e6;color:#13235f;font-size:clamp(18px,4.6vh,38px);font-weight:850;cursor:pointer;position:relative}
-  .sCell.given{background:#e9f4f1;color:#13235f;cursor:default}.sCell.external{background:#fff0b5;color:#8b5a00}.sCell.selected{outline:4px solid #5aa2ff;outline-offset:-4px}.sCell.wrong{animation:shake .45s;background:#ffc4bf}
-  .sCell.boxR{border-right:5px solid #15182a}.sCell.boxB{border-bottom:5px solid #15182a}
-  #sudokuNums{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}
-  #sudokuNums button{height:44px;border:0;border-radius:10px;background:#5aa2ff;color:#08142d;font-size:21px;font-weight:900;cursor:pointer}
-  #sudokuNums button:disabled{opacity:.28;cursor:not-allowed}#sudokuNote{font-size:12px;color:#ffd166;margin-top:9px;min-height:18px;text-align:center}
-  #sudokuExit{display:block;width:100%;height:38px;margin-top:7px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-size:14px;font-weight:800;cursor:pointer}
-  #sudokuExit:hover{background:rgba(255,255,255,.18)}
+  #sudokuUI{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);display:none;width:min(560px,calc(100vw - 24px));z-index:8;background:rgba(10,12,28,.9);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:10px;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  #sudokuNote{font-size:14px;color:#ffd166;min-height:20px;text-align:center;margin-bottom:8px}
+  #sudokuNums{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+  #sudokuNums button{height:42px;border:0;border-radius:10px;background:#5aa2ff;color:#08142d;font-size:21px;font-weight:900;cursor:pointer}
+  #sudokuNums button:disabled{opacity:.28;cursor:not-allowed}
   @media (max-width:560px){#help{font-size:11px;max-width:175px;padding:7px 10px}#help b{font-size:13px}.ctl{display:none}}
 </style>
 </head>
@@ -66,7 +58,7 @@
 <div id="fade"></div>
 <a id="devlink" href="dev/">Dev</a>
 <div id="inv"></div>
-<div id="sudokuUI"><div id="sudokuCard"><div id="sudokuHead"><b>WHITE FACE · 6×6</b><span>Fill every row, column and 2×3 region.</span></div><div id="sudokuGrid"></div><div id="sudokuNums"></div><div id="sudokuNote"></div><button id="sudokuExit" type="button">↑ Back to cube</button></div></div>
+<div id="sudokuUI"><div id="sudokuNote"></div><div id="sudokuNums"></div></div>
 <div id="bar"></div>
 <div id="gest"></div>
 
@@ -220,7 +212,7 @@ async function walk(path){for(const st of path){const a=frame(on),b=frame(st);co
     standOn(st);if(wrap)faceCamTo(b.N)}}
 async function walkTo(st){if(st===on)return;arrived=false;const path=bfs(s=>s===st);act();if(!path){toast('No path there yet\nTry Puzzle mode');return}
   busy=true;await walk(path);if(on.black)await fallInto(on);else{busy=false;arrivedSurface()}hud()}
-function arrivedSurface(){arrived=true;if(entAt(on)){toast(on===goal?'You found it!\nPress 3D Puzzle to go inside':'A room entrance\nPress 3D Puzzle to go inside')}hud()}
+function arrivedSurface(){arrived=true;if(entAt(on)){toast(on===goal?'You found it!\nPress Enter to go inside':'A room entrance\nPress Enter to go inside')}hud()}
 // arrow keys: pick the tile direction that best matches the screen direction
 const camDir=k=>{const r=V(1,0,0).applyQuaternion(cam.quaternion),u=V(0,1,0).applyQuaternion(cam.quaternion);return k==='up'?u:k==='down'?u.negate():k==='right'?r:r.negate()};
 async function keyStep(k){if(busy||turning)return;act();const want=camDir(k);
@@ -288,7 +280,7 @@ function shell(L,r,c,floorCol,wallCol){
   const fl=new THREE.Mesh(new THREE.BoxGeometry(W+.24,.2,W+.24),std('#1b1d27'));fl.position.y=RY-.1;fl.receiveShadow=true;roomG.add(fl);
   const tilesR=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++){const t=new THREE.Mesh(new THREE.BoxGeometry(S*.94,.12,S*.94),std(floorCol));t.position.copy(roomPos(i,j)).setY(RY+.06);t.receiveShadow=true;roomG.add(t);tilesR.push(t)}
   const lt=new THREE.PointLight(0xfff0d8,.7,9);lt.position.set(0,RY+2.3,0);roomG.add(lt);
-  return{walls,floor:tilesR}}
+  return{walls,floor:tilesR,base:fl}}
 function buildRoomA(r,c){// top layer: three lamps, three floor buttons
   const sh=shell(0,r,c,'#d9c7a8','#e9dcc6');
   const beam=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,6,16,1,true),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.08,side:2,depthWrite:false}));beam.position.set(0,RY+3,0);roomG.add(beam);
@@ -377,7 +369,7 @@ async function leaveRoom(){if(busy||where!=='room')return;busy=true;act();
   stickers.forEach(s=>{s.black=false;s.cover.visible=false});
   const st=entry.st;standOn(st);if(entry.wasGoal&&!solvedIds.has(entry.a.userData.id))setGoal(st);
   faceCamTo(frame(st).N);camSnap();await fade(0,.5);busy=false;
-  toast(goal===st?'Back where you came in\nPress 3D Puzzle to try again':'Back on the cube\nYou can come back any time');hud()}
+  toast(goal===st?'Back where you came in\nPress Enter to try again':'Back on the cube\nYou can come back any time');hud()}
 function startSticker(){return stickers.find(s=>s.center&&frame(s).N.equals(V(0,1,0)))}
 
 // ================= 54 facelet entrances: items, progress, inventory =================
@@ -392,7 +384,7 @@ function itemOf(kind,v,owner=''){if(kind==='num')return{id:`n${v}-${owner||'free
 const PAIRS=[...[3,1,2,4].map(v=>['clock','sudoku',itemOf('num',v)]),...Object.keys(GEMC).map(v=>['lamps','gemdoor',itemOf('gem',v)]),...Object.keys(GLY).map(v=>['stroke','pedestal',itemOf('shape',v)])];
 // 6 stand-alone rooms: solve them on their own, get a power that fits the room
 const SOLO=[0,1,2].map(i=>['stroke',itemOf('pen',i)]).concat([0,1,2].map(i=>['lamps',itemOf('compass',i)]));
-const NAMES={clock:'Clock Room',sudoku:'Sudoku Room',sudoku6:'White Sudoku',sky:'Sky Alignment',water:'Water Alignment',blueHard:'Deep Blue Challenge',sealed:'Sealed Entrance',lamps:'Lamp Room',gemdoor:'Gem Door',stroke:'One-Stroke Room',pedestal:'Shape Pedestal'};
+const NAMES={clock:'Clock Room',sudoku:'Sudoku Room',sudoku6:'White Sudoku',sky:'Sky Alignment',water:'Water Alignment',blueHard:'Deep Blue Challenge',lamps:'Lamp Room',gemdoor:'Gem Door',stroke:'One-Stroke Room',pedestal:'Shape Pedestal'};
 let ENT=[],inv=[],tutDone=false,visitedTut=false,leaveGlow=false,activeWhite=null,whiteVisitCount=0,blueTutorialDone=false;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 // start: turn every tile's path a random way, keeping only a small patch around the traveller connected
@@ -407,14 +399,15 @@ function tuneStart(){const cnt=()=>ENT.filter(e=>e.st===on||bfs(x=>x===e.st)).le
     if(!bfs(x=>x===ENT[0].st))continue;const n=cnt();const score=n<3?3-n:n>5?n-5:0;if(!best||score<best.score)best={score,rots};if(!score)break}
   stickers.forEach((s,i)=>s.rot=best?best.rots[i]:keep0[i]);stickers.forEach(s=>s.spin.rotation.z=s.rot*Math.PI/2)}
 function makeEntrances(){
-  // Every coloured facelet is a persistent entrance. White and blue are the
-  // first playable families; the other colours stay visibly sealed for now.
+  // This branch owns only the nine white and nine blue facelets. Other colours
+  // keep their existing traversal behavior for their contributors to define.
   const white=stickers.filter(s=>s.face==='U');
+  const blue=stickers.filter(s=>s.face==='B');
   const tutorial=white.find(s=>s.cu===1&&s.cv===0)||white[0];
-  const ordered=[tutorial,...stickers.filter(s=>s!==tutorial)];
+  const ordered=[tutorial,...white.filter(s=>s!==tutorial),...blue];
   let blueIndex=0;
   ENT=ordered.map(st=>{
-    let type='sealed',role='future';
+    let type='sudoku6',role='white';
     if(st.face==='U'){type='sudoku6';role='white'}
     else if(st.face==='B'){
       if(st.center){type='blueHard';role='blue-hard'}
@@ -451,7 +444,7 @@ function refreshGoal(){if(where==='surface')setGoal(nextGoal())}
 function markSolved(e){e.solved=true;e.dot.clear();e.dot.userData={};const plate=new THREE.Mesh(new THREE.BoxGeometry(.17,.17,.03),new THREE.MeshStandardMaterial({color:0xffd166,emissive:0x6a4a00}));plate.position.z=.1;e.dot.add(plate);
   e.state='complete';leaveGlow=true;
   if(e===activeWhite){activeWhite=null;tutDone=true;ENT.filter(x=>x.cooldown).forEach(x=>{x.cooldown=false;x.state='unvisited'})}
-  if(ENT.every(x=>x.solved))setTimeout(()=>toast('ALL 54 ENTRANCES COMPLETE!\nThe core is open'),2400);hud()}
+  if(ENT.every(x=>x.solved))setTimeout(()=>toast(`ALL ${ENT.length} REGISTERED ENTRANCES COMPLETE!\nThe core is open`),2400);hud()}
 function giveItem(item){inv.push(item);toast(`You got: ${item.glyph} ${item.name}\nIt's in your bag (bottom-left)`);hud();
   const el=document.querySelector(`#inv [data-id="${item.id}"]`);if(el){el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),900)}}
 
@@ -512,20 +505,36 @@ function buildSudoku(r,c,e){const sh=shell(0,r,c,'#d9c7a8','#efe6d6');sh.floor.f
   return{kind:'sudoku',sh,cells,ring,H,hits:[cells[H[0]*4+H[1]]],slot:cells[H[0]*4+H[1]],done:e.solved}}
 
 // ---------- white face: 6x6 Sudoku -> sum-seven floor ----------
-const SOL6=[[1,2,3,4,5,6],[4,5,6,1,2,3],[2,3,4,5,6,1],[5,6,1,2,3,4],[3,4,5,6,1,2],[6,1,2,3,4,5]];
-const PUZ6=[[1,0,0,4,0,6],[0,5,6,0,2,0],[0,0,4,0,6,1],[0,6,0,2,0,4],[3,0,5,0,1,0],[6,1,0,3,0,5]];
-const EXT6=[2,0];
-const FLOOR_ROUTE=[[2,0],[3,0],[3,1],[3,2],[3,3],[2,3],[2,4],[2,5]];
+const WHITE_LEVELS=[{
+  id:'white-01',
+  solution:[[1,2,3,4,5,6],[4,5,6,1,2,3],[2,3,4,5,6,1],[5,6,1,2,3,4],[3,4,5,6,1,2],[6,1,2,3,4,5]],
+  clues:[[1,0,0,4,0,6],[0,5,6,0,2,0],[0,0,4,0,6,1],[0,6,0,2,0,4],[3,0,5,0,1,0],[6,1,0,3,0,5]],
+  controlled:[{r:2,c:0,value:2,source:'blue-tutorial'}],
+  route:[[2,0],[3,0],[3,1],[3,2],[3,3],[2,3],[2,4],[2,5]],
+  pairTotal:7
+}];
+const SOL6=WHITE_LEVELS[0].solution,PUZ6=WHITE_LEVELS[0].clues,FLOOR_ROUTE=WHITE_LEVELS[0].route;
 const cell6Pos=(r,c)=>V((c-2.5)*.5,RY+.1,(r-2.5)*.5);
+function initWhiteEntry(e){
+  if(e.level)return;e.level=++whiteVisitCount;e.def=WHITE_LEVELS[Math.min(e.level-1,WHITE_LEVELS.length-1)];
+  e.values=e.def.clues.map(row=>row.slice());const ext=e.def.controlled[0];e.external=[ext.r,ext.c];e.externalInserted=false;e.mode=e.level===1?'whole':'pair';e.fragments={top:false,bottom:false};e.state='needs-number';e.item=itemOf('num',ext.value,e.id)
+}
+function paintSudokuCell(R,m,r,c){
+  const value=R.values[r][c],given=R.def.clues[r][c]!==0,controlled=R.def.controlled.some(x=>x.r===r&&x.c===c),selected=R.selected&&R.selected[0]===r&&R.selected[1]===c;
+  const bg=controlled&&!value?'#fff0b5':given?'#e9f4f1':'#fff6e6',fg=controlled&&!value?'#8b5a00':'#13235f',text=value?String(value):controlled?'?':'';
+  const old=m.material[2];if(old&&old.map)old.map.dispose();m.material[2]=new THREE.MeshStandardMaterial({map:label(text,{bg,fg,size:250}),emissive:selected?0x173b66:0x000000});
+  m.userData.value=value;m.position.y=m.userData.baseY+(selected ? .05 : 0)
+}
+function refreshSudokuMeshes(R=room){if(!R||R.kind!=='sudoku6')return;R.cells.forEach(m=>paintSudokuCell(R,m,m.userData.r,m.userData.c))}
 function buildSudoku6(r,c,e){
-  if(!e.level){e.level=++whiteVisitCount;e.values=PUZ6.map(row=>row.slice());e.external=e.level===1?EXT6.slice():[0,4];e.externalInserted=false;e.mode=e.level===1?'whole':'pair';e.fragments={top:false,bottom:false};e.state='needs-number';e.item=itemOf('num',SOL6[e.external[0]][e.external[1]],e.id)}
+  initWhiteEntry(e);
   activeWhite=e;e.visited=true;setEntranceIcon(e,e.mode==='pair'?'▲▼':String(e.item.v),e.mode==='pair'?'#d7f5ff':'#fff0b5');
   const sh=shell(0,r,c,'#cfdde0','#f7f2e8');sh.floor.forEach(t=>t.visible=false);
   const cells=[];
   for(let i=0;i<6;i++)for(let j=0;j<6;j++){
-    const value=SOL6[i][j],top=new THREE.MeshStandardMaterial({map:label(String(value),{bg:'#fff6e6',fg:'#13235f',size:250})});
+    const top=new THREE.MeshStandardMaterial({map:label('',{bg:'#fff6e6',fg:'#13235f',size:250})});
     const mats=[0,1,2,3,4,5].map(k=>k===2?top:std('#d9ebe8'));
-    const m=new THREE.Mesh(new THREE.BoxGeometry(.46,.16,.46),mats);m.position.copy(cell6Pos(i,j));m.userData={r:i,c:j,value,baseY:m.position.y};roomG.add(m);cells.push(m)
+    const m=new THREE.Mesh(new THREE.BoxGeometry(.46,.16,.46),mats);m.position.copy(cell6Pos(i,j));m.userData={r:i,c:j,value:0,baseY:m.position.y};roomG.add(m);cells.push(m)
   }
   const entryPad=new THREE.Mesh(new THREE.BoxGeometry(.42,.14,.54),std('#5aa2ff',{emissive:0x142744}));entryPad.position.set(-1.72,RY+.08,cell6Pos(2,0).z);roomG.add(entryPad);
   const door=new THREE.Group();door.position.set(1.72,RY,cell6Pos(2,5).z);roomG.add(door);
@@ -533,25 +542,20 @@ function buildSudoku6(r,c,e){
   const glow=new THREE.PointLight(0xffd166,.1,4);glow.position.set(-.15,1,0);door.add(glow);
   const reward=new THREE.Mesh(new THREE.OctahedronGeometry(.16),std('#ffd166',{emissive:0x6a4a00}));reward.position.set(-.35,1,0);reward.visible=false;door.add(reward);
   sign(`WHITE ${e.level} · SOLVE 6 × 6`);
-  return{kind:'sudoku6',phase:e.solved?'complete':'puzzle',sh,cells,entryPad,door,doorSlab:slab,doorGlow:glow,reward,values:e.values,selected:null,external:e.external.slice(),pairFirst:null,current:null,confirmed:null,route:FLOOR_ROUTE,done:e.solved,hits:[]}
+  const R={kind:'sudoku6',phase:e.solved?'complete':'puzzle',sh,cells,entryPad,door,doorSlab:slab,doorGlow:glow,reward,def:e.def,values:e.values,selected:null,external:e.external.slice(),pairFirst:null,current:null,confirmed:null,route:e.def.route,done:e.solved,hits:[]};refreshSudokuMeshes(R);return R
 }
 function showSudokuUI(){
   const ui=$('sudokuUI');if(!room||room.kind!=='sudoku6'||room.phase!=='puzzle'){ui.style.display='none';return}
-  ui.style.display='grid';const grid=$('sudokuGrid');grid.innerHTML='';
-  for(let r=0;r<6;r++)for(let c=0;c<6;c++){
-    const b=document.createElement('button'),given=PUZ6[r][c]!==0,external=r===room.external[0]&&c===room.external[1],v=room.values[r][c];
-    b.className='sCell'+(given?' given':'')+(external?' external':'')+(room.selected&&room.selected[0]===r&&room.selected[1]===c?' selected':'')+(c===2?' boxR':'')+((r===1||r===3)?' boxB':'');
-    b.textContent=v||external?String(v||'?'):'';b.disabled=given||external;b.title=external&&!v?'Find this number outside the room':'';
-    b.onclick=()=>{room.selected=[r,c];showSudokuUI()};grid.appendChild(b)
-  }
+  ui.style.display='block';refreshSudokuMeshes();
   const nums=$('sudokuNums');nums.innerHTML='';for(let v=1;v<=6;v++){const b=document.createElement('button');b.textContent=v;b.disabled=!room.selected;b.onclick=()=>inputSudoku(v);nums.appendChild(b)}
-  const[er,ec]=room.external;$('sudokuNote').textContent=room.values[er][ec]?'External number restored. Complete the remaining cells.':room.ent.mode==='pair'?`Combine the sky and water fragments to restore Number ${SOL6[er][ec]}.`:`One cell needs Number ${SOL6[er][ec]} from outside this room.`
+  const[er,ec]=room.external;$('sudokuNote').textContent=room.selected?'Choose 1–6 for the raised physical tile.':room.values[er][ec]?'Select a blank tile on the physical board.':`Number ${room.def.solution[er][ec]} is locked. Return to the surface and follow the blue marker.`
 }
-function inputSudoku(v){if(!room||room.kind!=='sudoku6'||!room.selected)return;const[r,c]=room.selected;if(PUZ6[r][c]||r===room.external[0]&&c===room.external[1])return;room.values[r][c]=v;room.selected=null;showSudokuUI();checkSudoku6()}
+function selectSudokuCell(r,c){if(!room||room.kind!=='sudoku6'||room.phase!=='puzzle')return;const controlled=room.def.controlled.some(x=>x.r===r&&x.c===c);if(room.def.clues[r][c])return toast('That clue is fixed');if(controlled)return toast(room.values[r][c]?'That discovered number is fixed':'Find this number outside the room');room.selected=[r,c];showSudokuUI()}
+function inputSudoku(v){if(!room||room.kind!=='sudoku6'||!room.selected)return;const[r,c]=room.selected;if(room.def.clues[r][c]||room.def.controlled.some(x=>x.r===r&&x.c===c))return;room.values[r][c]=v;room.selected=null;showSudokuUI();checkSudoku6()}
 function checkSudoku6(){
   if(room.values.some(row=>row.some(v=>!v)))return;
-  const wrong=[];room.values.forEach((row,r)=>row.forEach((v,c)=>{if(v!==SOL6[r][c])wrong.push([r,c])}));
-  if(wrong.length){$('sudokuNote').textContent='Some entries conflict with the completed grid.';const buttons=[...document.querySelectorAll('.sCell')];wrong.forEach(([r,c])=>buttons[r*6+c].classList.add('wrong'));return}
+  const wrong=[];room.values.forEach((row,r)=>row.forEach((v,c)=>{if(v!==room.def.solution[r][c])wrong.push([r,c])}));
+  if(wrong.length){$('sudokuNote').textContent='Some physical tiles conflict with the completed grid.';wrong.forEach(([r,c])=>{const m=room.cells[r*6+c];m.material[2].emissive.set(0x661711)});return}
   beginSudokuFloor()
 }
 async function beginSudokuFloor(){
@@ -564,9 +568,9 @@ async function walkSudokuFloor(r,c){
   if(busy||!room||room.kind!=='sudoku6'||room.phase!=='floor')return;const next=cell6Pos(r,c),cur=room.current;
   if(cur){if(Math.abs(cur[0]-r)+Math.abs(cur[1]-c)!==1){toast('Move one tile at a time');return}}
   else if(c!==0||Math.abs(next.z-room.entryPad.position.z)>.3){toast('Begin on the tile beside the entry');return}
-  const value=SOL6[r][c],from=player.position.clone();busy=true;await tween(.28,k=>player.position.lerpVectors(from,next.clone().setY(RY+.18),k));busy=false;
-  if(!room.pairFirst){room.pairFirst={r,c,value};room.current=[r,c];toast(`${value} · FIND ${7-value}`);hud();return}
-  if(room.pairFirst.value+value===7){room.pairFirst=null;room.current=[r,c];room.confirmedCell=[r,c];room.confirmed=player.position.clone();room.cells[r*6+c].material[2].emissive=new THREE.Color(0x173b2d);toast(`${7-value} + ${value} = 7`);if(c===5)completeWhiteDoor();hud();return}
+  const value=room.def.solution[r][c],from=player.position.clone();busy=true;await tween(.28,k=>player.position.lerpVectors(from,next.clone().setY(RY+.18),k));busy=false;
+  if(!room.pairFirst){room.pairFirst={r,c,value};room.current=[r,c];toast(`${value} · FIND ${room.def.pairTotal-value}`);hud();return}
+  if(room.pairFirst.value+value===room.def.pairTotal){room.pairFirst=null;room.current=[r,c];room.confirmedCell=[r,c];room.confirmed=player.position.clone();room.cells[r*6+c].material[2].emissive=new THREE.Color(0x173b2d);toast(`${room.def.pairTotal-value} + ${value} = ${room.def.pairTotal}`);if(c===5)completeWhiteDoor();hud();return}
   const first=room.pairFirst.value,back=room.confirmed.clone();await tween(.35,k=>player.position.lerpVectors(next.clone().setY(RY+.18),back,k));room.current=room.confirmedCell||null;room.pairFirst=null;toast(`${first} + ${value} ≠ 7\nPAIR RESET`);hud()
 }
 async function completeWhiteDoor(){
@@ -580,26 +584,30 @@ async function qaWalkRoute(){if(!room||room.kind!=='sudoku6'||room.phase!=='floo
 // ---------- blue face: grounded forced-perspective tutorial ----------
 function buildBlueAlignment(r,c,e){
   const water=e.type==='water',sh=shell(0,r,c,water?'#164d77':'#162d68',water?'#2f8ec5':'#263f86');
+  if(water){sh.base.position.y=RY-1.42;sh.floor.forEach(t=>{t.position.y=RY-1.28;t.material=std('#123b61',{roughness:.75})})}
   const tutorial=!blueTutorialDone&&activeWhite&&activeWhite.level===1,targetValue=tutorial?activeWhite.item.v:(water?'▼':'▲');sign(`${water?'WATER':'SKY'} · FIND ${targetValue}`);
   const target=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:label(String(targetValue),{bg:'#fff6e6',fg:'#13235f',size:260})}));target.position.set(-1.15,RY+1.5,-1.5*S+.09);roomG.add(target);
-  const solutionCam=V(0,RY+3.43,7.8),look=V(0,RY+.9,0),forward=look.clone().sub(solutionCam).normalize(),right=V(1,0,0),up=right.clone().cross(forward).normalize();
+  const solution={az:0,el:water?62:-45,r:1,c:1},look=water?V(0,RY-.45,0):V(0,RY+2.4,0),distance=water?4.2:3.2;
+  const er=solution.el*Math.PI/180,solutionCam=look.clone().add(V(0,Math.sin(er)*distance,Math.cos(er)*distance));
+  const forward=look.clone().sub(solutionCam).normalize(),right=V(1,0,0),up=right.clone().cross(forward).normalize();
   const glyph=tutorial?[[-.42,.6],[.05,.75],[.48,.55],[.4,.15],[.02,-.08],[-.35,-.35],[-.48,-.68],[.05,-.7],[.5,-.7]]:water?[[-.55,.65],[-.45,.2],[-.25,-.25],[0,-.62],[.25,-.25],[.45,.2],[.55,.65]]:[[0,.72],[-.2,.4],[.2,.4],[-.38,.05],[.38,.05],[-.58,-.55],[0,-.55],[.58,-.55]];
-  const stars=glyph.map(([x,y],i)=>{const dir=forward.clone().add(right.clone().multiplyScalar(x*.16)).add(up.clone().multiplyScalar(y*.16)).normalize(),p=solutionCam.clone().add(dir.multiplyScalar(5.8+i*.22));
+  const stars=glyph.map(([x,y],i)=>{const dir=forward.clone().add(right.clone().multiplyScalar(x*.16)).add(up.clone().multiplyScalar(y*.16)).normalize(),p=solutionCam.clone().add(dir.multiplyScalar((water?3.8:1.4)+i*(water ? .18 : .17)));
     const m=new THREE.Mesh(water?new THREE.OctahedronGeometry(.09):new THREE.SphereGeometry(.075,12,8),std(water?'#63ddff':'#fff3b0',{emissive:water?0x1d7ca5:0x665010}));m.position.copy(p);roomG.add(m);return m});
-  if(water){const plane=new THREE.Mesh(new THREE.PlaneGeometry(3.45,3.45),new THREE.MeshStandardMaterial({color:0x318bc4,transparent:true,opacity:.28,roughness:.15,side:2,depthWrite:false}));plane.rotation.x=-Math.PI/2;plane.position.y=RY+.55;roomG.add(plane)}
+  let waterPlane=null,ripple=null;if(water){waterPlane=new THREE.Mesh(new THREE.PlaneGeometry(3.45,3.45),new THREE.MeshStandardMaterial({color:0x318bc4,transparent:true,opacity:.34,roughness:.15,side:2,depthWrite:false}));waterPlane.rotation.x=-Math.PI/2;waterPlane.position.y=RY+.16;roomG.add(waterPlane);
+    ripple=new THREE.Mesh(new THREE.RingGeometry(.24,.31,32),new THREE.MeshBasicMaterial({color:0xa7efff,transparent:true,opacity:.65,side:2,depthWrite:false}));ripple.rotation.x=-Math.PI/2;ripple.position.y=RY+.18;roomG.add(ripple)}
   const marker=new THREE.Mesh(new THREE.RingGeometry(.22,.3,24),ringM(0x5ff0e0));marker.rotation.x=-Math.PI/2;marker.position.copy(roomPos(1,1)).setY(RY+.14);roomG.add(marker);
-  return{kind:'blueAlign',variant:e.type,tutorial,sh,stars,marker,targetValue,solution:{az:0,el:18,r:1,c:1},alignedSince:0,done:false,hits:null}
+  return{kind:'blueAlign',variant:e.type,tutorial,sh,stars,marker,targetValue,solution,look,distance,waterPlane,ripple,alignedSince:0,done:false,hits:null}
 }
 async function stepBlueFloor(r,c){
   if(busy||!room||room.kind!=='blueAlign'||room.done)return;if(Math.abs(r-rr)+Math.abs(c-rc)!==1){toast('Move one tile at a time');return}
-  busy=true;await roomWalk([[r,c]]);busy=false;checkBlueAlignment(true)
+  const from=player.position.clone(),to=roomPos(r,c).setY(room.variant==='water'?RY+.18:RY+.12);busy=true;player.rotation.set(0,Math.atan2(c-rc,r-rr),0);await tween(.3,k=>{player.position.lerpVectors(from,to,k);if(room.variant!=='water')player.position.y+=Math.sin(k*Math.PI)*.12});rr=r;rc=c;busy=false;checkBlueAlignment(true)
 }
 function angleDelta(a,b){return Math.abs(((a-b+540)%360)-180)}
 function checkBlueAlignment(fromMove=false){
   if(!room||room.kind!=='blueAlign'||room.done)return;const close=rr===room.solution.r&&rc===room.solution.c&&angleDelta(az,room.solution.az)<14&&Math.abs(el-room.solution.el)<14;
   room.stars.forEach(s=>s.material.emissiveIntensity=close?2:.7);
   if(close){if(!room.alignedSince)room.alignedSince=performance.now();if(performance.now()-room.alignedSince>350)finishBlueTutorial()}
-  else{room.alignedSince=0;if(fromMove)toast('Stand on the glowing marker\nthen align the lights with the wall shape')}
+  else{room.alignedSince=0;if(fromMove)toast(room.variant==='water'?'Float over the marker, then look down through the water':'Stand on the marker, then look up until the stars match')}
 }
 async function finishBlueTutorial(){
   if(!room||room.kind!=='blueAlign'||room.done||!activeWhite)return;room.done=true;busy=true;const e=room.ent,item=activeWhite.item;
@@ -632,7 +640,6 @@ function buildPedestal(r,c,e){const sh=shell(1,r,c,'#d6cfe6','#e9e4f3');
 
 // ---------- entering / leaving ----------
 async function enterRoom(){const e=entAt(on);if(!e||busy)return;
-  if(e.type==='sealed'){toast('This coloured entrance is sealed\nin the white-and-blue first pass');return}
   if(e.type==='blueHard'&&ENT.filter(x=>x.role==='white'&&x.solved).length<6){toast('The centre blue entrance is sealed\nComplete six white entrances first');return}
   if(e.type==='sudoku6'&&activeWhite&&activeWhite!==e&&!activeWhite.solved){toast(`White ${activeWhite.level} is still active\nFollow its marked entrance`);setGoal(activeWhite.st);return}
   if(['sky','water'].includes(e.type)&&!activeWhite){toast('A white Sudoku must reveal\nwhich number this room should form');return}
@@ -642,20 +649,20 @@ async function enterRoom(){const e=entAt(on);if(!e||busy)return;
   const f=frame(on);const p0=player.getWorldPosition(V(0,0,0));scene.attach(player);
   await tween(.9,k=>{player.position.copy(p0).add(f.N.clone().multiplyScalar(-k*k*1.4));if(k>.5)$('fade').style.opacity=(k-.5)/.5});
   entry={st:on,a:on.cubie,ent:e};cube.visible=false;clearRoom();const pa=posOf(on.cubie);
-  const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildBlueAlignment,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
+  const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildBlueAlignment,blueHard:buildBlueAlignment,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
   room=B(pa.z+1,pa.x+1,e);room.ent=e;where='room';
-  if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else if(room.kind==='blueAlign'){rr=2;rc=1}else{rr=2;rc=1}
-  enterRoomSpace();if(room.kind==='blueAlign'){az=28;el=32}camSnap();await dropIn();busy=false;leaveGlow=false;hud();
+  if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else if(room.kind==='blueAlign'){rr=room.variant==='sky'?0:2;rc=1}else{rr=2;rc=1}
+  enterRoomSpace();if(room.kind==='blueAlign'){az=28;el=room.variant==='water'?25:20}camSnap();await dropIn();if(room.kind==='blueAlign'&&room.variant==='water')player.position.y=RY+.18;busy=false;leaveGlow=false;hud();
   if(room.kind==='sudoku6')showSudokuUI();
-  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: restore the external number,\nthen complete the 6×6 grid.`,sky:'Stand on the glowing marker.\nMove the camera until the stars match the wall.',water:'Float to the glowing marker.\nAlign the lights below with the wall shape.',lamps:'Step on the buttons\nto light all three lamps',
+  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the glowing marker.\nLook up until the stars match the target.',water:'Float to the glowing marker.\nLook down through the water to align the lights.',blueHard:'The deep-blue challenge is reserved for later.',lamps:'Step on the buttons\nto light all three lamps',
     stroke:'Draw the shape on the wall\nin one stroke',gemdoor:'This door is missing a gem',pedestal:'Something fits in this pedestal'}[e.type];
   toast(e.solo?intro+`\nReward: ${e.item.glyph} ${e.item.name}`:intro);
-  if(room.kind==='sudoku6'&&!e.externalInserted)setTimeout(()=>{if(where==='room'&&room.ent===e&&room.phase==='puzzle'){leaveGlow=true;toast(`Number ${e.item.v} is missing.\nGo Up and find an active blue entrance.`);hud()}},2800)}
+  if(room.kind==='sudoku6'&&!e.externalInserted)setTimeout(()=>{if(where==='room'&&room.ent===e&&room.phase==='puzzle'){leaveGlow=true;toast(`Number ${e.item.v} is missing.\nReturn to the surface and follow the blue marker.`);hud()}},2800)}
 async function leaveRooms(){if(busy||where!=='room')return;busy=true;act();
   $('sudokuUI').style.display='none';
   const p0=player.position.clone();await Promise.all([tween(.6,k=>player.position.y=p0.y+k*k*3),fade(1,.6)]);
   clearRoom();where='surface';mode='explore';cube.visible=true;body.rotation.set(0,0,0);standOn(entry.st);faceCamTo(frame(entry.st).N);refreshGoal();camSnap();await fade(0,.5);busy=false;leaveGlow=false;
-  if(goal)toast(goal===on?'Press 3D Puzzle to go back in':'Follow the glowing tile');hud()}
+  if(goal)toast(goal===on?'Press Enter to go back in':'Follow the glowing tile');hud()}
 
 // ---------- in-room actions ----------
 async function tapRoomThing(obj){if(busy)return;act();const e=room.ent;
@@ -700,7 +707,7 @@ function faceCamTo(n){if(Math.abs(n.y)>.5){el=n.y>0?55:-55}else{el=25;az=Math.at
 function camGoal(){let tgt,d,e=el;
   if(where==='surface'){if(mode==='puzzle'){tgt=V(0,0,0);d=8.6}else{tgt=player.getWorldPosition(V(0,0,0));d=5.2}}
   else if(where==='room'){
-    if(room&&room.kind==='blueAlign'){tgt=V(0,RY+.9,0);d=8.2;e=el}
+    if(room&&room.kind==='blueAlign'){tgt=room.look;d=room.distance;e=el}
     else if(room&&room.kind==='sudoku6'&&room.phase==='puzzle'){tgt=V(0,RY+.4,0);d=6.8;e=68}
     else{tgt=V(0,RY+.9,0);d=8.2;e=Math.max(Math.abs(el),42)}
   }else{tgt=V(0,RY+2.2,0);d=8.5;e=Math.max(Math.abs(el),20)}
@@ -729,7 +736,8 @@ ren.domElement.addEventListener('pointermove',e=>{if(!drag)return;const d=drag;i
 ren.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d)return;clearTimeout(d.timer);if(d.moved&&where==='room'&&room&&room.kind==='blueAlign')checkBlueAlignment();if(d.moved||d.held||busy||turning)return;
   if(where==='surface'&&d.st){painting?paintTile(d.st):mode==='puzzle'?spinTile(d.st):walkTo(d.st)}
   else if(where==='room'){
-    if(room.kind==='sudoku6'&&room.phase==='floor'){const h=pick(e,room.cells);if(h){const d=h.object.userData;walkSudokuFloor(d.r,d.c)}}
+    if(room.kind==='sudoku6'&&room.phase==='puzzle'){const h=pick(e,room.cells);if(h){const d=h.object.userData;selectSudokuCell(d.r,d.c)}}
+    else if(room.kind==='sudoku6'&&room.phase==='floor'){const h=pick(e,room.cells);if(h){const d=h.object.userData;walkSudokuFloor(d.r,d.c)}}
     else if(room.kind==='blueAlign'){const h=pick(e,room.sh.floor);if(h){const i=room.sh.floor.indexOf(h.object);stepBlueFloor(Math.floor(i/3),i%3)}}
     else if(room.hits){const h=pick(e,room.hits);if(h)tapRoomThing(h.object)}else{const h=pick(e,room.sh.floor);if(h){const i=room.sh.floor.indexOf(h.object);tapRoomCell(Math.floor(i/3),i%3)}}}});
 addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();toggleMode();return}const K={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'}[e.key];
@@ -741,35 +749,44 @@ function undoTurn(){if(turning||busy)return;const mv=myTurns.pop();if(!mv){toast
 function toggleMode(){if(where!=='surface'||busy)return;painting=false;mode=mode==='explore'?'puzzle':'explore';act();hud()}
 function scramble(n=20){let last=-1;for(let i=0;i<n;i++){let a;do a=Math.floor(Math.random()*3);while(a===last);last=a;turn(AX[a],Math.floor(Math.random()*3)-1,Math.random()<.5?1:-1,0)}}
 function autoSolve(){if(turning||busy||!log.length)return;solving=true;act();const h=log.splice(0);h.reverse().forEach(m=>turn(m.axis,m.idx,-m.dir,.07))}
+async function devOpen(kind){
+  if(!['127.0.0.1','localhost'].includes(location.hostname)||where!=='surface'||busy)return;
+  const white=ENT.find(e=>e.role==='white'&&!e.solved)||ENT.find(e=>e.role==='white');initWhiteEntry(white);activeWhite=white;
+  let e=white;if(kind==='sky'||kind==='water'){e=ENT.find(x=>x.type===kind);blueTutorialDone=false;e.cooldown=false}
+  if(!e)return;standOn(e.st);faceCamTo(frame(e.st).N);camSnap();arrived=true;mode='explore';await enterRoom();
+  if(kind==='floor'&&room&&room.kind==='sudoku6'){white.externalInserted=true;white.values=white.def.solution.map(row=>row.slice());room.values=white.values;refreshSudokuMeshes();await beginSudokuFloor()}
+}
 function hud(){let help='',stat='';const bb='style="display:inline;font-size:inherit"';const gl=(goal&&where==='surface'?'<br><span style="color:#ffd166">★ Walk to the glowing tile.</span>':'')+(painting?'<br><span style="color:#ff8a7a">✏️ Tap a tile to draw a crossroad.</span>':'');
-  if(where==='surface'){help=mode==='puzzle'?`<b style="color:#f2a33a">PUZZLE MODE</b><i><b ${bb}>Swipe</b> a tile: turn its whole row.<br><b ${bb}>Tap</b> a tile: spin just that tile.</i>`
-      :`<b style="color:#7fe0a8">EXPLORATION MODE</b><i><b ${bb}>Arrow keys</b> or <b ${bb}>tap</b> a tile to walk — paths can wrap round the cube's edges.<br>⚪ pit = a way down into a room · ◼ gold = solved.</i>`;
+  if(where==='surface'){help=mode==='puzzle'?`<b style="color:#f2a33a">ROTATE THE CUBE</b><i><b ${bb}>Swipe</b> a tile to turn its row.<br><b ${bb}>Tap</b> a tile to rotate that path.</i>`
+      :`<b style="color:#7fe0a8">WALK THE SURFACE</b><i><b ${bb}>Arrow keys</b> or <b ${bb}>tap</b> a connected tile to move.<br>⚪ pit = entrance · ◼ gold = solved.</i>`;
     stat=`FACES <span style="color:#1fd6e0">${facesDone} / 6</span>`}
   else if(where==='room'){const c=entry.a,e=room.ent,nm=`<b style="color:#ffe27a">${NAMES[e.type].toUpperCase()} · ${layerName(c)} ${typeOf(c).toUpperCase()}</b>`;
-    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',sudoku6:room.phase==='floor'?'Cross the grid in two-step pairs totalling 7.':room.phase==='complete'?'Door reached. This entrance is complete.':'Restore the external number, then complete the 6×6 grid.',sky:'Stand on the marker and align the stars with the wall symbol.',water:'Move across the surface and align the lights below.',lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
-    help=nm+`<i>${room.done?'Solved ✓ — tap Up.':tip}</i>`;stat='INSIDE THE CUBE'}
+    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',sudoku6:room.phase==='floor'?'Cross the grid in two-step pairs totalling 7.':room.phase==='complete'?'Door reached. This entrance is complete.':'Select blanks on the physical board. Return to the surface for locked values.',sky:'Stand on the marker, then look up to align the stars.',water:'Float over the marker and look down through the water.',blueHard:'Reserved for the later two-number challenge.',lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
+    help=nm+`<i>${room.done?'Solved ✓ — return to the surface.':tip}</i>`;stat='INSIDE THE CUBE'}
   else if(false){const c=entry.a;help=room.kind==='sudoku'?`<b style="color:#ffe27a">SUDOKU ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'Solved!':'Tap the empty square.'}</i>`:`<b style="color:#9fd0ff">CLOCK ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'You took the 3.':'Tap the number that doesn\'t belong.'}</i>`;stat='INSIDE THE CUBE'}
   else if(where==='room'){const c=room.kind==='A'?entry.a:entry.b;help=room.kind==='A'?`<b style="color:#ffe27a">${layerName(c)} LAYER · ${typeOf(c).toUpperCase()}</b><i>Arrow keys or tap the floor to walk. Light all three lamps.</i>`
       :`<b style="color:#9fd0ff">${layerName(c)} LAYER · ${typeOf(c).toUpperCase()}</b><i>Arrow keys or tap a tile next to you. Stepped tiles turn black. Draw the wall's shape in one stroke.</i>`;stat='INSIDE THE CUBE'}
   else{help='<b style="color:#ff9c7a">THE CORE</b><i>The hidden 27th room.</i>';stat='CORE'}
   const localDev=['127.0.0.1','localhost'].includes(location.hostname);
-  const devLinks=!localDev?'':where==='surface'&&mode==='puzzle'?'<br><a href="#" id="dbg" style="color:#8a86a8;font-size:10px">dev: auto-solve</a>':where==='surface'&&goal?'<br><a href="#" id="dbggoal" style="color:#8a86a8;font-size:10px">dev: go to goal</a>':where==='room'&&room.kind==='blueAlign'&&!room.done?'<br><a href="#" id="dbgalign" style="color:#8a86a8;font-size:10px">dev: solve alignment</a>':where==='room'&&room.kind==='sudoku6'&&room.phase==='puzzle'&&room.ent.externalInserted?'<br><a href="#" id="dbgfill" style="color:#8a86a8;font-size:10px">dev: fill Sudoku</a>':where==='room'&&room.kind==='sudoku6'&&room.phase==='floor'?'<br><a href="#" id="dbgroute" style="color:#8a86a8;font-size:10px">dev: walk valid route</a>':'';
-  $('help').innerHTML=help+gl;$('stat').innerHTML=stat+`<br>ENTRANCES <span style="color:#f2c14e">${ENT.filter(x=>x.solved).length} / 54</span>`+devLinks;
-  const dbg=$('dbg');if(dbg)dbg.onclick=ev=>{ev.preventDefault();myTurns.length=0;autoSolve()};const dbggoal=$('dbggoal');if(dbggoal)dbggoal.onclick=ev=>{ev.preventDefault();if(goal){standOn(goal);faceCamTo(frame(goal).N);camSnap();arrivedSurface()}};const dbgalign=$('dbgalign');if(dbgalign)dbgalign.onclick=ev=>{ev.preventDefault();finishBlueTutorial()};const dbgfill=$('dbgfill');if(dbgfill)dbgfill.onclick=ev=>{ev.preventDefault();room.values=SOL6.map(row=>row.slice());room.ent.values=room.values;showSudokuUI();checkSudoku6()};const dbgroute=$('dbgroute');if(dbgroute)dbgroute.onclick=ev=>{ev.preventDefault();qaWalkRoute()};
+  const quick=localDev&&where==='surface'?'<br><span style="font-size:10px;color:#8a86a8">test: <a href="#" id="devwhite">white</a> · <a href="#" id="devsky">sky</a> · <a href="#" id="devwater">water</a> · <a href="#" id="devfloor">floor</a></span>':'';
+  const devLinks=(!localDev?'':where==='surface'&&mode==='puzzle'?'<br><a href="#" id="dbg" style="color:#8a86a8;font-size:10px">dev: auto-solve</a>':where==='surface'&&goal?'<br><a href="#" id="dbggoal" style="color:#8a86a8;font-size:10px">dev: go to goal</a>':where==='room'&&room.kind==='blueAlign'&&!room.done?'<br><a href="#" id="dbgalign" style="color:#8a86a8;font-size:10px">dev: solve alignment</a>':where==='room'&&room.kind==='sudoku6'&&room.phase==='puzzle'&&room.ent.externalInserted?'<br><a href="#" id="dbgfill" style="color:#8a86a8;font-size:10px">dev: fill Sudoku</a>':where==='room'&&room.kind==='sudoku6'&&room.phase==='floor'?'<br><a href="#" id="dbgroute" style="color:#8a86a8;font-size:10px">dev: walk valid route</a>':'')+quick;
+  $('help').innerHTML=help+gl;$('stat').innerHTML=stat+`<br>ENTRANCES <span style="color:#f2c14e">${ENT.filter(x=>x.solved).length} / ${ENT.length}</span>`+devLinks;
+  const dbg=$('dbg');if(dbg)dbg.onclick=ev=>{ev.preventDefault();myTurns.length=0;autoSolve()};const dbggoal=$('dbggoal');if(dbggoal)dbggoal.onclick=ev=>{ev.preventDefault();if(goal){standOn(goal);faceCamTo(frame(goal).N);camSnap();arrivedSurface()}};const dbgalign=$('dbgalign');if(dbgalign)dbgalign.onclick=ev=>{ev.preventDefault();finishBlueTutorial()};const dbgfill=$('dbgfill');if(dbgfill)dbgfill.onclick=ev=>{ev.preventDefault();room.values=room.def.solution.map(row=>row.slice());room.ent.values=room.values;refreshSudokuMeshes();showSudokuUI();checkSudoku6()};const dbgroute=$('dbgroute');if(dbgroute)dbgroute.onclick=ev=>{ev.preventDefault();qaWalkRoute()};
+  [['devwhite','white'],['devsky','sky'],['devwater','water'],['devfloor','floor']].forEach(([id,kind])=>{const a=$(id);if(a)a.onclick=ev=>{ev.preventDefault();devOpen(kind)}});
   const here=where==='core'?'1,1,1':where==='room'?keyOf(entry.a):null;let m='';
   ['TOP','MID','BOT'].forEach((nm,L)=>{m+=`<div class="lay">${nm}<div class="g">`;for(let r=0;r<3;r++)for(let c=0;c<3;c++){const k=L+','+r+','+c;
       m+=`<span class="${[solvedAt(k)?'done':'',here===k?'here':'',k==='1,1,1'?'core':''].join(' ')}"></span>`}m+='</div></div>'});$('map').innerHTML=m;
   const bar0=$('bar');bar0.innerHTML='';const row=document.createElement('div');row.className='row';bar0.appendChild(row);
   const B=(t,f,id,cls='')=>{const b=document.createElement('button');b.className='b '+cls;if(id)b.id=id;b.innerHTML=t;b.onclick=f;row.appendChild(b);return b};
   if(where==='surface'){
-    if(entAt(on)&&arrived&&!painting)B('▶ 3D Puzzle',enterRoom,'puzb','go3 pulse');
+    if(entAt(on)&&arrived&&!painting)B('Enter',enterRoom,'puzb','go3 pulse');
     const seg=document.createElement('div');seg.className='seg';row.appendChild(seg);
-    [['puzzle','🧩 Puzzle'],['explore','🚶 Explore']].forEach(([m,t])=>{const b=document.createElement('button');b.className='segb'+(mode===m?' on':'');b.innerHTML=t;b.onclick=()=>setMode(m);if(m!==mode)b.id='modeb';seg.appendChild(b)});
+    [['puzzle','Rotate cube'],['explore','Walk']].forEach(([m,t])=>{const b=document.createElement('button');b.className='segb'+(mode===m?' on':'');b.innerHTML=t;b.onclick=()=>setMode(m);if(m!==mode)b.id='modeb';seg.appendChild(b)});
     if(painting)B('✕ Cancel pen',()=>{painting=false;hud()});
     else if(mode==='puzzle'){B('↶',undoTurn,'',(myTurns.length?'':'dim ')+'sq').title='Undo';B('◀',()=>{az+=90;act()},'','sq');B('▶',()=>{az-=90;act()},'','sq')}}
-  else if(where==='room'){if((room.kind==='A'||room.kind==='B')&&!room.done)B('⟲ Reset',resetRoom);B('↑ Up',leaveRooms,'leaveb',leaveGlow?'go3 pulse':'')}
+  else if(where==='room'){if((room.kind==='A'||room.kind==='B')&&!room.done)B('⟲ Reset',resetRoom);B('Return to surface',leaveRooms,'leaveb',leaveGlow?'go3 pulse':'')}
   if(where==='surface'&&ENT.length&&ENT.every(x=>x.solved))B('◉ Enter the Core',()=>{busy=true;fade(1,.5).then(()=>{cube.visible=false;scene.attach(player);body.rotation.set(-Math.PI/2,0,0);toCore()})},'coreb','go3 pulse');
-  const g=$('gest');g.textContent=where==='surface'?(painting?'Tap any tile to draw a crossroad':mode==='puzzle'?'Swipe tile: turn row · Tap: spin tile · ↶ undo · ◀ ▶ look around':'Tap a tile or arrow keys: walk · Drag: look around'):where==='room'?(room.hits?'Tap things in the room · Tap a bag item to use it':'Tap the floor or arrow keys: walk'):'';
+  const g=$('gest');g.textContent=where==='surface'?(painting?'Tap any tile to draw a crossroad':mode==='puzzle'?'Rotate cube: swipe row · tap path · undo available':'Walk: tap connected tile or use arrow keys · drag to look'):where==='room'?(room.hits?'Tap things in the room · Tap a bag item to use it':'Move with arrows or tap · drag to look · Return to surface exits'):'';
   // bag
   const iv=$('inv');iv.innerHTML=inv.length?'<div class="ttl">BAG</div>':'<div class="ttl">BAG · empty</div>';
   inv.forEach(it=>{const d=document.createElement('button');d.className='chip';d.dataset.id=it.id;d.title=it.name;d.innerHTML=`<span style="color:${it.color}">${it.glyph}</span>`;d.onclick=()=>useItem(it);iv.appendChild(d)})}
@@ -783,13 +800,13 @@ function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.
   
   hintM.material.opacity=hintUntil>now?.55+.35*Math.sin(t*6):Math.max(0,hintM.material.opacity-dt*2);
   if(room&&room.sh){const cd=V(cam.position.x,0,cam.position.z).normalize();room.sh.walls.forEach(w=>{const vis=w.userData.n.dot(cd)<.35;w.visible=vis;if(w.userData.win){w.userData.win.visible=vis;w.userData.fr.visible=vis}})}
+  if(room&&room.kind==='blueAlign'&&room.variant==='water'&&!busy){player.position.y=RY+.18+Math.sin(t*2.2)*.025;if(room.ripple){room.ripple.position.x=player.position.x;room.ripple.position.z=player.position.z;room.ripple.scale.setScalar(1+.08*Math.sin(t*2.2));room.ripple.material.opacity=.5+.15*Math.sin(t*2.2)}}
   if(room&&room.kind==='blueAlign'&&!room.done)checkBlueAlignment();
   if(room&&room.kind==='core')room.holo.rotation.y=t*.4;if(room&&room.ring)room.ring.material.opacity=.55+.45*Math.sin(t*4);
   camUpdate(dt);ren.render(scene,cam)}
 stickers.forEach(s=>s.homeW=worldExits(s));// remember how every tile is drawn on the finished cube
 scramble(20);queue.push({axis:AX[0],idx:9,dir:0,dur:0,res:()=>{log.length=log.length;standOn(startSticker());setTimeout(()=>started=true,50);faceCamTo(V(0,1,0));camSnap();jumbleTiles();makeEntrances();tuneStart();refreshGoal();hud();setTimeout(()=>toast('Find a way to the glowing tile'),600)}});
 loop();addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
-$('sudokuExit').onclick=leaveRooms;
 
 </script>
 </body>

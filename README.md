@@ -1,4 +1,4 @@
-# Magic Cube — 54 Entrances
+# Magic Cube — White + Blue Vertical Slice
 
 > 🚧 **Work in progress.** Rough prototype for team discussion — rules, rooms and ending are all still open.
 
@@ -19,9 +19,9 @@ Based on Koki's Unity prototype: https://kkoki0808.github.io/MagicCubePrototype_
 The world is a **scrambled Rubik's cube**. Every square carries a raised black path.
 A little traveller walks along those paths — but the paths only connect when the cube is turned the right way.
 
-A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. In this design, every facelet is a possible entrance rather than every physical cubie owning one room. Edge and corner cubies can therefore carry two or three independent entrances.
+A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. This branch implements entrances only for the **nine white** and **nine blue** facelets. Green, red, orange and yellow retain their existing traversal behavior for their contributors to define.
 
-Step into a facelet entrance to enter its puzzle space. White entrances contain progressive 6×6 Sudoku levels. Blue entrances contain sky and water alignment puzzles that provide numbers or number fragments required by the white rooms. The other colour families remain open for the rest of the team to define.
+Step into a registered facelet entrance to enter its puzzle space. White entrances contain 6×6 Sudoku levels. Blue entrances contain sky and water alignment puzzles that provide numbers or number fragments required by the white rooms.
 
 ## How to play
 
@@ -37,8 +37,8 @@ Step into a facelet entrance to enter its puzzle space. White entrances contain 
 
 **Rooms**
 
-1. Walk onto a white pit → a **▶ 3D Puzzle** button appears.
-2. Inside the room, solve the puzzle. Press **↑ Up** anytime to go back to where you came in.
+1. Walk onto a registered pit → an **Enter** button appears.
+2. Inside the room, solve the puzzle. Press **Return to surface** to go back to the same facelet.
 3. A solved entrance turns into a **gold square**. Visited white entrances retain a symbol showing their current requirement, even after the cube moves.
 4. Items you collect go into the **bag** (bottom left). In a room that needs one, tap the item to use it.
 
@@ -46,10 +46,11 @@ Step into a facelet entrance to enter its puzzle space. White entrances contain 
 
 - Enter any unvisited white facelet to assign the next Sudoku difficulty.
 - Restore puzzle-specific numbers found in blue rooms or along the outer maze.
-- Complete a 6×6 Sudoku using numbers 1–6 and 2×3 regions.
+- Complete the physical 6×6 Sudoku board using numbers 1–6 and 2×3 regions. The physical board is the puzzle; there is no duplicate popup grid.
 - The solved Sudoku becomes a 3D floor. Cross it in consecutive two-step pairs totalling seven.
 - Reaching the door completes the white entrance; its future door reward is intentionally still open.
 - The first blue alignment teaches the mechanic by revealing a complete number.
+- Sky rooms are solved by standing on the ground and looking upward. Water rooms place the player in a floating state and are solved by looking down through the surface.
 - Later sky and water alignments reveal matching top and bottom fragments that combine into a number.
 
 **Legacy prototype room types**
@@ -68,12 +69,12 @@ Step into a facelet entrance to enter its puzzle space. White entrances contain 
 
 **Tutorial (first rooms)**
 
-A glowing square shows the first white entrance: a 6×6 Sudoku with one externally locked number.
-You cannot finish it → a marked blue entrance teaches the forced-perspective alignment mechanic → collect the number → return to the marked white entrance → complete the Sudoku → cross its sum-seven floor → reach the door.
+A glowing square shows the first white entrance: a physical 6×6 Sudoku with one externally locked number.
+You cannot finish it → return to the surface → follow the marked blue entrance → collect the number → return to the same marked white entrance → restore the physical tile → complete the Sudoku → the same board becomes the sum-seven floor → reach the door.
 
 **Faces** — when all nine squares of one face line up, that face's paths glow.
 
-**Ending** — the complete 54-entrance ending and central reward structure are still being designed.
+**Ending** — the full entrance plan and central reward structure are still being designed by the team.
 
 ## Dev tool
 
@@ -88,7 +89,7 @@ Tools: Draw · Erase · Pick piece · line size · ink colour · Undo · Clear a
 ## Open questions
 
 - What the solved cube looks like (gift box vs. one big loop — see `docs/images/`)
-- Whether the cube restores itself after all 54 entrances, per colour, or per layer
+- How each contributor's colour registers entrances and contributes to restoration
 - Story / narrative
 - Ending inside the core
 
@@ -97,6 +98,7 @@ Tools: Draw · Erase · Pick piece · line size · ink colour · Undo · Clear a
 ```
 index.html        Game demo (single file, three.js r128 from CDN)
 scripts/          Deterministic puzzle and route validation
+                  plus a zero-dependency local preview server
 dev/index.html    Dev tool (path designer)
 docs/images/      Screenshots used in this README
 prototypes/       Earlier experiments (2D squares, 9 cubes, illusion rooms, …)

@@ -27,9 +27,21 @@ const route = [
   [2, 4], [2, 5],
 ];
 
+const controlled = [
+  { row: 2, column: 0, value: 2, source: "blue-tutorial" },
+];
+const registeredSources = new Set(["blue-tutorial", "sky", "water", "outer-maze"]);
+
 const expected = "123456";
 for (let row = 0; row < 6; row += 1) {
   assert([...solution[row]].sort().join("") === expected, `Invalid row ${row + 1}`);
+}
+
+for (const slot of controlled) {
+  assert(slot.row >= 0 && slot.row < 6 && slot.column >= 0 && slot.column < 6, "Controlled slot is outside the grid");
+  assert(puzzle[slot.row][slot.column] === 0, `Controlled slot ${slot.row + 1},${slot.column + 1} must begin blank`);
+  assert(solution[slot.row][slot.column] === slot.value, `Controlled value mismatch at ${slot.row + 1},${slot.column + 1}`);
+  assert(registeredSources.has(slot.source), `Unknown exploration source: ${slot.source}`);
 }
 for (let column = 0; column < 6; column += 1) {
   assert(solution.map((row) => row[column]).sort().join("") === expected, `Invalid column ${column + 1}`);
@@ -109,4 +121,5 @@ console.log(JSON.stringify({
   uniqueSolutions: solutionCount,
   routeValues: route.map(([row, column]) => solution[row][column]),
   routePairs: route.length / 2,
+  controlledSlots: controlled,
 }, null, 2));
