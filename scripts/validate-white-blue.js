@@ -27,6 +27,8 @@ const route = [
   [2, 4], [2, 5],
 ];
 
+const waterRoute = [[2, 1], [2, 0], [1, 0], [0, 0], [0, 1], [0, 2]];
+
 const controlled = [
   { row: 2, column: 0, value: 2, source: "blue-tutorial" },
 ];
@@ -118,11 +120,19 @@ for (let index = 0; index < route.length; index += 2) {
   assert(solution[firstRow][firstColumn] + solution[secondRow][secondColumn] === 7, `Route pair ${index / 2 + 1} does not total seven`);
 }
 
+assert(new Set(waterRoute.map((cell) => cell.join(","))).size === waterRoute.length, "Water route repeats a block");
+for (let index = 1; index < waterRoute.length; index += 1) {
+  const [previousRow, previousColumn] = waterRoute[index - 1];
+  const [row, column] = waterRoute[index];
+  assert(Math.abs(previousRow - row) + Math.abs(previousColumn - column) === 1, `Water route step ${index + 1} is not adjacent`);
+}
+
 console.log(JSON.stringify({
   sudoku: "valid 6x6",
   uniqueSolutions: solutionCount,
   routeValues: route.map(([row, column]) => solution[row][column]),
   routePairs: route.length / 2,
+  waterRoute,
   controlledSlots: controlled,
   initialBlanks: blankCount,
 }, null, 2));
