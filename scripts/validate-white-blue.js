@@ -12,12 +12,12 @@ const solution = [
 ];
 
 const puzzle = [
-  [1, 0, 0, 4, 0, 6],
-  [0, 5, 6, 0, 2, 0],
-  [0, 0, 4, 0, 6, 1],
-  [0, 6, 0, 2, 0, 4],
-  [3, 0, 5, 0, 1, 0],
-  [6, 1, 0, 3, 0, 5],
+  [1, 2, 3, 4, 5, 6],
+  [4, 5, 6, 1, 2, 3],
+  [0, 3, 4, 5, 6, 1],
+  [5, 6, 1, 2, 3, 4],
+  [3, 4, 5, 6, 1, 2],
+  [6, 1, 2, 3, 4, 5],
 ];
 
 const route = [
@@ -43,6 +43,8 @@ for (const slot of controlled) {
   assert(solution[slot.row][slot.column] === slot.value, `Controlled value mismatch at ${slot.row + 1},${slot.column + 1}`);
   assert(registeredSources.has(slot.source), `Unknown exploration source: ${slot.source}`);
 }
+const blankCount = puzzle.flat().filter((value) => value === 0).length;
+assert(blankCount === controlled.length, `Expected only ${controlled.length} exploration-controlled blanks, found ${blankCount}`);
 for (let column = 0; column < 6; column += 1) {
   assert(solution.map((row) => row[column]).sort().join("") === expected, `Invalid column ${column + 1}`);
 }
@@ -122,4 +124,5 @@ console.log(JSON.stringify({
   routeValues: route.map(([row, column]) => solution[row][column]),
   routePairs: route.length / 2,
   controlledSlots: controlled,
+  initialBlanks: blankCount,
 }, null, 2));

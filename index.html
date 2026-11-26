@@ -508,7 +508,7 @@ function buildSudoku(r,c,e){const sh=shell(0,r,c,'#d9c7a8','#efe6d6');sh.floor.f
 const WHITE_LEVELS=[{
   id:'white-01',
   solution:[[1,2,3,4,5,6],[4,5,6,1,2,3],[2,3,4,5,6,1],[5,6,1,2,3,4],[3,4,5,6,1,2],[6,1,2,3,4,5]],
-  clues:[[1,0,0,4,0,6],[0,5,6,0,2,0],[0,0,4,0,6,1],[0,6,0,2,0,4],[3,0,5,0,1,0],[6,1,0,3,0,5]],
+  clues:[[1,2,3,4,5,6],[4,5,6,1,2,3],[0,3,4,5,6,1],[5,6,1,2,3,4],[3,4,5,6,1,2],[6,1,2,3,4,5]],
   controlled:[{r:2,c:0,value:2,source:'blue-tutorial'}],
   route:[[2,0],[3,0],[3,1],[3,2],[3,3],[2,3],[2,4],[2,5]],
   pairTotal:7
@@ -528,6 +528,7 @@ function paintSudokuCell(R,m,r,c){
 function refreshSudokuMeshes(R=room){if(!R||R.kind!=='sudoku6')return;R.cells.forEach(m=>paintSudokuCell(R,m,m.userData.r,m.userData.c))}
 function buildSudoku6(r,c,e){
   initWhiteEntry(e);
+  const stored=inv.find(x=>x.kind==='num'&&x.owner===e.id);if(stored&&!e.externalInserted){const slot=e.def.controlled[0];e.values[slot.r][slot.c]=stored.v;e.externalInserted=true;e.state='sudoku-ready';e.justRestored=stored.v;inv=inv.filter(x=>x!==stored);setEntranceIcon(e,String(stored.v),'#c9f2d6','#1b6b3a')}
   activeWhite=e;e.visited=true;setEntranceIcon(e,e.mode==='pair'?'▲▼':String(e.item.v),e.mode==='pair'?'#d7f5ff':'#fff0b5');
   const sh=shell(0,r,c,'#cfdde0','#f7f2e8');sh.floor.forEach(t=>t.visible=false);
   const cells=[];
@@ -547,7 +548,7 @@ function buildSudoku6(r,c,e){
 function showSudokuUI(){
   const ui=$('sudokuUI');if(!room||room.kind!=='sudoku6'||room.phase!=='puzzle'){ui.style.display='none';return}
   ui.style.display='block';refreshSudokuMeshes();
-  const nums=$('sudokuNums');nums.innerHTML='';for(let v=1;v<=6;v++){const b=document.createElement('button');b.textContent=v;b.disabled=!room.selected;b.onclick=()=>inputSudoku(v);nums.appendChild(b)}
+  const nums=$('sudokuNums'),editable=room.def.clues.some((row,r)=>row.some((v,c)=>!v&&!room.def.controlled.some(x=>x.r===r&&x.c===c)));nums.style.display=editable?'grid':'none';nums.innerHTML='';for(let v=1;v<=6;v++){const b=document.createElement('button');b.textContent=v;b.disabled=!room.selected;b.onclick=()=>inputSudoku(v);nums.appendChild(b)}
   const[er,ec]=room.external;$('sudokuNote').textContent=room.selected?'Choose 1–6 for the raised physical tile.':room.values[er][ec]?'Select a blank tile on the physical board.':`Number ${room.def.solution[er][ec]} is locked. Return to the surface and follow the blue marker.`
 }
 function selectSudokuCell(r,c){if(!room||room.kind!=='sudoku6'||room.phase!=='puzzle')return;const controlled=room.def.controlled.some(x=>x.r===r&&x.c===c);if(room.def.clues[r][c])return toast('That clue is fixed');if(controlled)return toast(room.values[r][c]?'That discovered number is fixed':'Find this number outside the room');room.selected=[r,c];showSudokuUI()}
@@ -587,7 +588,7 @@ function buildBlueAlignment(r,c,e){
   if(water){sh.base.position.y=RY-1.42;sh.floor.forEach(t=>{t.position.y=RY-1.28;t.material=std('#123b61',{roughness:.75})})}
   const tutorial=!blueTutorialDone&&activeWhite&&activeWhite.level===1,targetValue=tutorial?activeWhite.item.v:(water?'▼':'▲');sign(`${water?'WATER':'SKY'} · FIND ${targetValue}`);
   const target=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:label(String(targetValue),{bg:'#fff6e6',fg:'#13235f',size:260})}));target.position.set(-1.15,RY+1.5,-1.5*S+.09);roomG.add(target);
-  const solution={az:0,el:water?62:-45,r:1,c:1},look=water?V(0,RY-.45,0):V(0,RY+2.4,0),distance=water?4.2:3.2;
+  const solution={az:0,el:water?62:-52,r:1,c:1},look=water?V(0,RY-.45,0):V(0,RY+3,0),distance=water?4.2:2.8;
   const er=solution.el*Math.PI/180,solutionCam=look.clone().add(V(0,Math.sin(er)*distance,Math.cos(er)*distance));
   const forward=look.clone().sub(solutionCam).normalize(),right=V(1,0,0),up=right.clone().cross(forward).normalize();
   const glyph=tutorial?[[-.42,.6],[.05,.75],[.48,.55],[.4,.15],[.02,-.08],[-.35,-.35],[-.48,-.68],[.05,-.7],[.5,-.7]]:water?[[-.55,.65],[-.45,.2],[-.25,-.25],[0,-.62],[.25,-.25],[.45,.2],[.55,.65]]:[[0,.72],[-.2,.4],[.2,.4],[-.38,.05],[.38,.05],[-.58,-.55],[0,-.55],[.58,-.55]];
@@ -656,7 +657,8 @@ async function enterRoom(){const e=entAt(on);if(!e||busy)return;
   if(room.kind==='sudoku6')showSudokuUI();
   const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the glowing marker.\nLook up until the stars match the target.',water:'Float to the glowing marker.\nLook down through the water to align the lights.',blueHard:'The deep-blue challenge is reserved for later.',lamps:'Step on the buttons\nto light all three lamps',
     stroke:'Draw the shape on the wall\nin one stroke',gemdoor:'This door is missing a gem',pedestal:'Something fits in this pedestal'}[e.type];
-  toast(e.solo?intro+`\nReward: ${e.item.glyph} ${e.item.name}`:intro);
+  if(room.kind==='sudoku6'&&e.justRestored){const restored=e.justRestored;e.justRestored=null;toast(`NUMBER ${restored} RESTORED\nThe completed board is transforming`);setTimeout(()=>{if(where==='room'&&room&&room.kind==='sudoku6')checkSudoku6()},650)}
+  else toast(e.solo?intro+`\nReward: ${e.item.glyph} ${e.item.name}`:intro);
   if(room.kind==='sudoku6'&&!e.externalInserted)setTimeout(()=>{if(where==='room'&&room.ent===e&&room.phase==='puzzle'){leaveGlow=true;toast(`Number ${e.item.v} is missing.\nReturn to the surface and follow the blue marker.`);hud()}},2800)}
 async function leaveRooms(){if(busy||where!=='room')return;busy=true;act();
   $('sudokuUI').style.display='none';
