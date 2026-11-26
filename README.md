@@ -50,7 +50,7 @@ Step into a registered facelet entrance to enter its puzzle space. White entranc
 - The solved Sudoku becomes a 3D floor. Cross it in consecutive two-step pairs totalling seven.
 - Reaching the door completes the white entrance; its future door reward is intentionally still open.
 - The first blue alignment teaches the mechanic by revealing a complete number.
-- Sky rooms are solved by standing on the ground and looking upward. Water rooms place the player in a floating state and are solved by looking down through the surface.
+- Sky rooms are perspective puzzles: the grounded player changes viewpoint until only the stars form the target. Water rooms use a complementary search mechanic: the floating player scans submerged nodes and illuminates the correct pieces to reveal the target.
 - Later sky and water alignments reveal matching top and bottom fragments that combine into a number.
 
 **Legacy prototype room types**
