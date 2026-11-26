@@ -38,6 +38,9 @@
   .dim{opacity:.45}.sq{min-width:44px;padding:0;font-size:18px}
   .segb{padding:0 10px}
   #devlink{position:fixed;right:10px;bottom:24px;z-index:20;background:#e5484d;color:#fff;text-decoration:none;font:800 12px ui-monospace,Menlo,monospace;letter-spacing:.08em;padding:7px 12px;border-radius:999px;opacity:.85}
+  #demoQuick{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:21;display:none;gap:5px;padding:5px;background:rgba(8,10,24,.82);border:1px solid rgba(255,255,255,.18);border-radius:13px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  #demoQuick button{border:0;border-radius:9px;background:rgba(255,255,255,.13);color:#eef;font:800 11px ui-monospace,Menlo,monospace;padding:8px 10px;cursor:pointer;white-space:nowrap}
+  #demoQuick button:hover,#demoQuick button:focus{background:#5aa2ff;color:#07152d;outline:none}
   @media (max-width:560px){#devlink{bottom:118px}}
   #hintb{background:#ff7aa2;color:#2a0a14}
   @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(242,163,58,.45)}}.pulse{animation:pulse 1s infinite}
@@ -57,6 +60,9 @@
 <div id="panel"></div>
 <div id="fade"></div>
 <a id="devlink" href="dev/">Dev</a>
+<div id="demoQuick" aria-label="Quick demo rooms">
+  <button data-room="white">Sudoku</button><button data-room="sky">Sky</button><button data-room="water">Water</button><button data-room="floor">Traversal</button>
+</div>
 <div id="inv"></div>
 <div id="sudokuUI"><div id="sudokuNote"></div><div id="sudokuNums"></div></div>
 <div id="bar"></div>
@@ -774,12 +780,15 @@ function scramble(n=20){let last=-1;for(let i=0;i<n;i++){let a;do a=Math.floor(M
 function autoSolve(){if(turning||busy||!log.length)return;solving=true;act();const h=log.splice(0);h.reverse().forEach(m=>turn(m.axis,m.idx,-m.dir,.07))}
 function devSolveBlue(){if(!room||room.done)return;if(room.kind==='waterReveal'){[...room.targetCells].forEach(key=>{[rr,rc]=key.split(',').map(Number);checkWaterReveal()});player.position.copy(roomPos(rr,rc)).setY(RY+.18);return}if(room.kind==='blueAlign'){rr=room.solution.r;rc=room.solution.c;player.position.copy(roomPos(rr,rc)).setY(RY+.12);az=room.solution.az;el=room.solution.el;camSnap();room.alignedSince=performance.now()-500;checkBlueAlignment()}}
 async function devOpen(kind){
-  if(!['127.0.0.1','localhost'].includes(location.hostname)||where!=='surface'||busy)return;
+  if(!['127.0.0.1','localhost'].includes(location.hostname)||busy)return;
+  if(where==='room')await leaveRooms();
+  if(where!=='surface'||busy)return;
   const white=ENT.find(e=>e.role==='white'&&!e.solved)||ENT.find(e=>e.role==='white');initWhiteEntry(white);activeWhite=white;
   let e=white;if(kind==='sky'||kind==='water'){e=ENT.find(x=>x.type===kind);blueTutorialDone=false;e.cooldown=false}
   if(!e)return;standOn(e.st);faceCamTo(frame(e.st).N);camSnap();arrived=true;mode='explore';await enterRoom();
   if(kind==='floor'&&room&&room.kind==='sudoku6'){white.externalInserted=true;white.values=white.def.solution.map(row=>row.slice());room.values=white.values;refreshSudokuMeshes();await beginSudokuFloor()}
 }
+if(['127.0.0.1','localhost'].includes(location.hostname)){const q=$('demoQuick');q.style.display='flex';q.querySelectorAll('button').forEach(b=>b.onclick=()=>devOpen(b.dataset.room))}
 function hud(){let help='',stat='';const bb='style="display:inline;font-size:inherit"';const gl=(goal&&where==='surface'?'<br><span style="color:#ffd166">★ Walk to the glowing tile.</span>':'')+(painting?'<br><span style="color:#ff8a7a">✏️ Tap a tile to draw a crossroad.</span>':'');
   if(where==='surface'){help=mode==='puzzle'?`<b style="color:#f2a33a">ROTATE THE CUBE</b><i><b ${bb}>Swipe</b> a tile to turn its row.<br><b ${bb}>Tap</b> a tile to rotate that path.</i>`
       :`<b style="color:#7fe0a8">WALK THE SURFACE</b><i><b ${bb}>Arrow keys</b> or <b ${bb}>tap</b> a connected tile to move.<br>⚪ pit = entrance · ◼ gold = solved.</i>`;
