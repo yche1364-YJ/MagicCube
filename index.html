@@ -567,11 +567,11 @@ function checkSudoku6(){
 }
 async function beginSudokuFloor(){
   if(!room||room.kind!=='sudoku6'||room.phase!=='puzzle')return;room.phase='transition';$('sudokuUI').style.display='none';busy=true;
-  await tween(.9,k=>room.cells.forEach(m=>{m.position.y=m.userData.baseY+Math.sin(k*Math.PI)*.08+k*(m.userData.value-1)*.025;m.rotation.y=k*Math.PI/2}));
-  if(room.ruleSign){room.ruleSign.material.map=signTex(`PAIR SUM = ${room.def.pairTotal}`);room.ruleSign.material.needsUpdate=true}
+  await tween(.9,k=>room.cells.forEach(m=>{m.position.y=m.userData.baseY+Math.sin(k*Math.PI)*.08+k*(m.userData.value-1)*.025;m.rotation.y=-k*Math.PI/2}));
+  if(room.ruleSign){room.ruleSign.material.map=signTex(`PAIR SUM = ${room.def.pairTotal}`);room.ruleSign.material.needsUpdate=true;room.ruleSign.position.set(1.5*S-.08,RY+2.05,0);room.ruleSign.rotation.y=-Math.PI/2}
   room.phase='floor';room.ent.state='traversal-ready';room.pairFirst=null;room.current=null;room.confirmed=room.entryPad.position.clone();room.tutorialPair=true;
   const[startR,startC]=room.route[0];room.cells[startR*6+startC].material[2].emissive.set(0x6a4a00);
-  player.position.copy(room.entryPad.position).setY(RY+.16);busy=false;toast('THE GRID BECOMES THE FLOOR\nStart on the glowing 2');hud()
+  player.position.copy(room.entryPad.position).setY(RY+.16);az=-90;el=48;camSnap();busy=false;toast('THE GRID BECOMES THE FLOOR\nStart on the glowing 2');hud()
 }
 async function walkSudokuFloor(r,c){
   if(busy||!room||room.kind!=='sudoku6'||room.phase!=='floor')return;const next=cell6Pos(r,c),cur=room.current;
