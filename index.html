@@ -561,7 +561,7 @@ function checkSudoku6(){
 }
 async function beginSudokuFloor(){
   if(!room||room.kind!=='sudoku6'||room.phase!=='puzzle')return;room.phase='transition';$('sudokuUI').style.display='none';busy=true;
-  await tween(.9,k=>room.cells.forEach(m=>{m.position.y=m.userData.baseY+Math.sin(k*Math.PI)*.08+k*(m.userData.value-1)*.025}));
+  await tween(.9,k=>room.cells.forEach(m=>{m.position.y=m.userData.baseY+Math.sin(k*Math.PI)*.08+k*(m.userData.value-1)*.025;m.rotation.y=k*Math.PI/2}));
   if(room.ruleSign){room.ruleSign.material.map=signTex(`PAIR SUM = ${room.def.pairTotal}`);room.ruleSign.material.needsUpdate=true}
   room.phase='floor';room.ent.state='traversal-ready';room.pairFirst=null;room.current=null;room.confirmed=room.entryPad.position.clone();room.tutorialPair=true;
   const[startR,startC]=room.route[0];room.cells[startR*6+startC].material[2].emissive.set(0x6a4a00);
@@ -673,7 +673,7 @@ async function enterRoom(){const e=entAt(on);if(!e||busy)return;
   const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildWaterReveal,blueHard:buildBlueAlignment,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
   room=B(pa.z+1,pa.x+1,e);room.ent=e;where='room';
   if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else if(room.kind==='blueAlign'){rr=0;rc=1}else if(room.kind==='waterReveal'){rr=2;rc=1}else{rr=2;rc=1}
-  enterRoomSpace();if(room.kind==='sudoku6'){az=0;el=62}else if(room.kind==='blueAlign'){az=28;el=20}else if(room.kind==='waterReveal'){az=18;el=48}camSnap();await dropIn();if(room.kind==='waterReveal')player.position.y=RY+.18;busy=false;leaveGlow=false;hud();
+  enterRoomSpace();if(room.kind==='blueAlign'){az=28;el=20}else if(room.kind==='waterReveal'){az=18;el=48}camSnap();await dropIn();if(room.kind==='waterReveal')player.position.y=RY+.18;busy=false;leaveGlow=false;hud();
   if(room.kind==='sudoku6')showSudokuUI();
   const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the marker and change viewpoint.\nOnly the stars form the target.',water:'Copy the pattern shown on the wall.\nFloat over matching submerged blocks to light them.',blueHard:'The deep-blue challenge is reserved for later.',lamps:'Step on the buttons\nto light all three lamps',
     stroke:'Draw the shape on the wall\nin one stroke',gemdoor:'This door is missing a gem',pedestal:'Something fits in this pedestal'}[e.type];
