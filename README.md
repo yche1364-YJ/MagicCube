@@ -1,4 +1,4 @@
-# Magic Cube — 27 Rooms
+# Magic Cube — 54 Entrances
 
 > 🚧 **Work in progress.** Rough prototype for team discussion — rules, rooms and ending are all still open.
 
@@ -19,17 +19,9 @@ Based on Koki's Unity prototype: https://kkoki0808.github.io/MagicCubePrototype_
 The world is a **scrambled Rubik's cube**. Every square carries a raised black path.
 A little traveller walks along those paths — but the paths only connect when the cube is turned the right way.
 
-A Rubik's cube is made of **27 pieces**: 26 on the outside and 1 hidden core.
-Each of the **26 outer pieces has one entrance** (a white pit). Step into a pit and you drop into a **3D puzzle room**.
-Solve all 26 rooms to unlock the **core** in the very middle — the ending.
+A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. In this design, every facelet is a possible entrance rather than every physical cubie owning one room. Edge and corner cubies can therefore carry two or three independent entrances.
 
-| Colours on a piece | Piece | Count |
-|---|---|---|
-| 1 | Centre | 6 |
-| 2 | Edge | 12 |
-| 3 | Corner | 8 |
-| 0 | Core (hidden) | 1 |
-| | **Total** | **27** |
+Step into a facelet entrance to enter its puzzle space. White entrances contain progressive 6×6 Sudoku levels. Blue entrances contain sky and water alignment puzzles that provide numbers or number fragments required by the white rooms. The other colour families remain open for the rest of the team to define.
 
 ## How to play
 
@@ -47,10 +39,20 @@ Solve all 26 rooms to unlock the **core** in the very middle — the ending.
 
 1. Walk onto a white pit → a **▶ 3D Puzzle** button appears.
 2. Inside the room, solve the puzzle. Press **↑ Up** anytime to go back to where you came in.
-3. A solved pit turns into a **gold square**, and the TOP / MID / BOT minimap (top right) lights up.
+3. A solved entrance turns into a **gold square**. Visited white entrances retain a symbol showing their current requirement, even after the cube moves.
 4. Items you collect go into the **bag** (bottom left). In a room that needs one, tap the item to use it.
 
-**Room types**
+**White-and-blue first pass**
+
+- Enter any unvisited white facelet to assign the next Sudoku difficulty.
+- Restore puzzle-specific numbers found in blue rooms or along the outer maze.
+- Complete a 6×6 Sudoku using numbers 1–6 and 2×3 regions.
+- The solved Sudoku becomes a 3D floor. Cross it in consecutive two-step pairs totalling seven.
+- Reaching the door completes the white entrance; its future door reward is intentionally still open.
+- The first blue alignment teaches the mechanic by revealing a complete number.
+- Later sky and water alignments reveal matching top and bottom fragments that combine into a number.
+
+**Legacy prototype room types**
 
 - **Give / need pairs (10 pairs)** — one room gives an item, another room needs it:
   - Clock → Sudoku (a number 1–4)
@@ -66,12 +68,12 @@ Solve all 26 rooms to unlock the **core** in the very middle — the ending.
 
 **Tutorial (first rooms)**
 
-A glowing square shows where to go first: a nearly finished 4×4 sudoku that is **missing one number**.
-You can't finish it → a gold beam leads you to a **clock** room, where one number is different → take it → go back and finish the sudoku.
+A glowing square shows the first white entrance: a 6×6 Sudoku with one externally locked number.
+You cannot finish it → a marked blue entrance teaches the forced-perspective alignment mechanic → collect the number → return to the marked white entrance → complete the Sudoku → cross its sum-seven floor → reach the door.
 
 **Faces** — when all nine squares of one face line up, that face's paths glow.
 
-**Ending** — when all 26 rooms are solved, an **Enter the Core** button appears. *(The ending itself is still being designed.)*
+**Ending** — the complete 54-entrance ending and central reward structure are still being designed.
 
 ## Dev tool
 
@@ -86,7 +88,7 @@ Tools: Draw · Erase · Pick piece · line size · ink colour · Undo · Clear a
 ## Open questions
 
 - What the solved cube looks like (gift box vs. one big loop — see `docs/images/`)
-- Whether the cube restores itself after all 26 rooms, or per layer
+- Whether the cube restores itself after all 54 entrances, per colour, or per layer
 - Story / narrative
 - Ending inside the core
 
@@ -94,6 +96,7 @@ Tools: Draw · Erase · Pick piece · line size · ink colour · Undo · Clear a
 
 ```
 index.html        Game demo (single file, three.js r128 from CDN)
+scripts/          Deterministic puzzle and route validation
 dev/index.html    Dev tool (path designer)
 docs/images/      Screenshots used in this README
 prototypes/       Earlier experiments (2D squares, 9 cubes, illusion rooms, …)
