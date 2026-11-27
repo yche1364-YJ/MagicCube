@@ -19,7 +19,20 @@ Based on Koki's Unity prototype: https://kkoki0808.github.io/MagicCubePrototype_
 The world is a **scrambled Rubik's cube**. Every square carries a raised black path.
 A little traveller walks along those paths — but the paths only connect when the cube is turned the right way.
 
-A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. Entrances are implemented for the **nine white**, **nine blue** and **nine orange** facelets (27 so far). Green, red and yellow retain their existing traversal behavior for their contributors to define.
+A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. There are **26 entrances — exactly one white dot on each outer piece** (6 centres + 12 edges + 8 corners); the hidden core is the 27th piece.
+
+| Colour | Entrances | Rooms |
+|---|---|---|
+| White | 5 | 6×6 Sudoku (croth03) |
+| Blue | 5 | Sky ×2 · Water ×2 · Deep-blue centre |
+| Orange | 5 | Solar Reflection, levels 1–5 |
+| Yellow | 5 | *being designed* |
+| Pink | 5 | *being designed* |
+| Green | 1 (centre) | *being designed* |
+
+<img src="docs/images/entrances_26.png" width="520" alt="26 entrance positions">
+
+Dot positions live in `ENTRANCE_PLAN` in `index.html`; `node scripts/validate-orange.js` checks there is one dot per piece.
 
 Step into a registered facelet entrance to enter its puzzle space. White entrances contain 6×6 Sudoku levels. Blue entrances contain sky and water alignment puzzles that provide numbers or number fragments required by the white rooms.
 
@@ -55,7 +68,7 @@ Step into a registered facelet entrance to enter its puzzle space. White entranc
 
 **Orange — Solar Reflection** *(ported from the orange contributor's prototype, original in `prototypes/orange-solar-reflection.html`)*
 
-- Enter any orange facelet: each orange entrance gets the next mirror level the first time you enter it (5 levels; entrances 6–9 reuse them for now).
+- Enter any orange facelet: the five orange entrances get mirror levels 1–5 in the order you enter them.
 - Sunlight enters the room from one wall. **Tap a gold mirror** to turn it 90°. **Blue mirrors on wheels**: tap to select → tap a glowing floor tile to move it → tap it again (or **R**) to rotate.
 - Light every crystal at the same time to solve the room. Orange rooms are independent: they need no items from other colours.
 - Levels are checked by `node scripts/validate-orange.js`.

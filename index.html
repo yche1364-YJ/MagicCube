@@ -478,19 +478,24 @@ function tuneStart(){const cnt=()=>ENT.filter(e=>e.st===on||bfs(x=>x===e.st)).le
   for(let t=0;t<80;t++){const p=.35+.5*(t%10)/10;const rots=stickers.map(s=>s===on||Math.random()>p?0:Math.floor(Math.random()*4));stickers.forEach((s,i)=>s.rot=rots[i]);
     if(!bfs(x=>x===ENT[0].st))continue;const n=cnt();const score=n<3?3-n:n>5?n-5:0;if(!best||score<best.score)best={score,rots};if(!score)break}
   stickers.forEach((s,i)=>s.rot=best?best.rots[i]:keep0[i]);stickers.forEach(s=>s.spin.rotation.z=s.rot*Math.PI/2)}
+const ENTRANCE_PLAN=['D-1,-1','L0,-1','L1,-1','B1,0','L0,0','L1,0','B1,1','U-1,0','L1,1','D0,-1','D0,0','D0,1','B0,0','F0,0','B0,1','U0,0','U0,-1','B-1,-1','R0,-1','D1,1','R1,0','R0,0','R-1,0','U1,1','R0,1','U1,-1'];
 function makeEntrances(){
-  // White and blue facelets (croth03) plus the nine orange facelets (Solar Reflection).
-  // Other colours keep their existing traversal behavior for their contributors to define.
-  const white=stickers.filter(s=>s.face==='U');
-  const blue=stickers.filter(s=>s.face==='B');
-  const orange=stickers.filter(s=>s.face==='L');
-  const tutorial=white.find(s=>s.cu===1&&s.cv===0)||white[0];
-  const ordered=[tutorial,...white.filter(s=>s!==tutorial),...blue,...orange];
+  // 26 entrances = exactly one per outer piece (6 centres + 12 edges + 8 corners).
+  // White 5 · Yellow 5 · Pink 5 · Blue 5 · Orange 5 · Green 1 (centre only).
+  // Each key is home face + (u,v) on that face. Edit ENTRANCE_PLAN to move a dot;
+  // keep one dot per piece. See docs/images/entrances_26.png.
+  const pick=f=>stickers.filter(s=>s.face===f&&ENTRANCE_PLAN.includes(f+s.cu+','+s.cv));
+  const white=pick('U'),blue=pick('B'),orange=pick('L'),yellow=pick('D'),pink=pick('R'),green=pick('F');
+  const tutorial=white.find(s=>s.cu===-1&&s.cv===0)||white.find(s=>!s.center)||white[0];
+  const ordered=[tutorial,...white.filter(s=>s!==tutorial),...blue,...orange,...yellow,...pink,...green];
   let blueIndex=0;
   ENT=ordered.map(st=>{
     let type='sudoku6',role='white';
     if(st.face==='U'){type='sudoku6';role='white'}
     else if(st.face==='L'){type='solar';role='orange'}
+    else if(st.face==='D'){type='todo';role='yellow'}
+    else if(st.face==='R'){type='todo';role='pink'}
+    else if(st.face==='F'){type='todo';role='green'}
     else if(st.face==='B'){
       if(st.center){type='blueHard';role='blue-hard'}
       else{type=blueIndex++%2?'water':'sky';role=type}
@@ -504,7 +509,7 @@ const pitTex=(()=>{const c=document.createElement('canvas');c.width=c.height=128
 function makePit(entry){const g=new THREE.Group();const top=.087,R=.085;
   const rim=new THREE.Mesh(new THREE.RingGeometry(R,R+.022,40),new THREE.MeshStandardMaterial({color:0xffffff,emissive:0x555555,roughness:.4,side:2}));rim.position.z=top+.002;g.add(rim);
   const mouth=new THREE.Mesh(new THREE.CircleGeometry(R,40),new THREE.MeshBasicMaterial({map:pitTex}));mouth.position.z=top+.001;g.add(mouth);
-  const col=entry&&entry.role==='orange'?0xff9a45:entry&&entry.role==='white'?0xfff6e6:entry&&entry.role.startsWith('blue')||entry&&['sky','water'].includes(entry.role)?0x5aa2ff:0x8a7cff;
+  const col=entry&&entry.role==='orange'?0xff9a45:entry&&entry.role==='yellow'?0xffcf3f:entry&&entry.role==='pink'?0xff6b81:entry&&entry.role==='green'?0x4fcf8c:entry&&entry.role==='white'?0xfff6e6:entry&&entry.role.startsWith('blue')||entry&&['sky','water'].includes(entry.role)?0x5aa2ff:0x8a7cff;
   const glow=new THREE.Mesh(new THREE.RingGeometry(R*.25,R*.45,32),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,depthWrite:false}));glow.position.z=top+.0015;g.add(glow);
   const icon=new THREE.Mesh(new THREE.PlaneGeometry(.12,.12),new THREE.MeshBasicMaterial({transparent:true,depthTest:false}));icon.position.z=top+.006;icon.renderOrder=9;icon.visible=false;g.add(icon);
   g.userData={rim,mouth,glow,icon};return g}
@@ -745,7 +750,7 @@ function buildPedestal(r,c,e){const sh=shell(1,r,c,'#d6cfe6','#e9e4f3');
 
 // ================= ORANGE: Solar Reflection rooms (ported from the orange contributor's prototype) =================
 // Each orange facelet gets a level the first time it is entered, in visit order. There are
-// SolarEngine.levels.length authored levels; entrances beyond that reuse them in order.
+// SolarEngine.levels.length authored levels (five, one per orange entrance).
 let orangeVisits=0;
 const solarAt=(r,c,y=.6)=>new THREE.Vector3((Math.max(-.42,Math.min(2.42,c))-1)*S,RY+y,(Math.max(-.42,Math.min(2.42,r))-1)*S);
 function buildSolar(r,c,e){
@@ -826,7 +831,8 @@ function solarDevSolve(){const R=room;if(!R||R.kind!=='solar'||R.done)return;con
 
 // ---------- entering / leaving ----------
 async function enterRoom(){const e=entAt(on);if(!e||busy)return;
-  if(e.type==='blueHard'&&ENT.filter(x=>x.role==='white'&&x.solved).length<6){toast('The centre blue entrance is sealed\nComplete six white entrances first');return}
+  if(e.type==='todo'){toast(`This ${e.role} room is still being designed\nCome back later`);return}
+  if(e.type==='blueHard'&&ENT.some(x=>x.role==='white'&&!x.solved)){toast(`The centre blue entrance is sealed\nComplete all ${ENT.filter(x=>x.role==='white').length} white entrances first`);return}
   if(e.type==='sudoku6'&&activeWhite&&activeWhite!==e&&!activeWhite.solved){toast(`White ${activeWhite.level} is still active\nFollow its marked entrance`);setGoal(activeWhite.st);return}
   if(['sky','water'].includes(e.type)&&!activeWhite){toast('A white Sudoku must reveal\nwhich number this room should form');return}
   if(['sky','water'].includes(e.type)&&blueTutorialDone&&activeWhite.mode!=='pair'){toast('This alignment chamber is dormant\nuntil a paired white requirement activates it');return}
