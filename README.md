@@ -36,6 +36,10 @@ Dot positions live in `ENTRANCE_PLAN` in `index.html`; `node scripts/validate-or
 
 Step into a registered facelet entrance to enter its puzzle space. White entrances contain 6×6 Sudoku levels. Blue entrances contain sky and water alignment puzzles that provide numbers or number fragments required by the white rooms.
 
+## Your explorer
+
+The game starts on a **Choose your explorer** screen: pick a colour, eyes (one eye / two eyes / happy) and a hat (none / keyboard cap / explorer hat). The explorer always carries a backpack — a treasure peeks out of it while your bag holds an item. The choice is remembered on that device; the **Explorer** button (bottom right) changes it while on the surface.
+
 ## How to play
 
 **Two modes** (switch at the bottom):
