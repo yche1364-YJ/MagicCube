@@ -37,6 +37,17 @@
   .segb.on{background:#f2a33a;color:#1a1a1a}
   .dim{opacity:.45}.sq{min-width:44px;padding:0;font-size:18px}
   .segb{padding:0 10px}
+  #title{position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(circle at 50% 45%,rgba(20,16,45,.35),rgba(8,9,22,.92) 70%);text-align:center;padding:20px;transition:opacity .45s}
+  #title.hide{opacity:0;pointer-events:none}
+  #title h1 .w{display:inline-flex}#title h1{margin:0;font:900 clamp(44px,13vw,108px)/.95 -apple-system,'Segoe UI','Arial Rounded MT Bold',sans-serif;letter-spacing:.02em;display:flex;flex-wrap:wrap;justify-content:center;gap:0 .3em}
+  #title h1 span{display:inline-block;text-shadow:0 .06em 0 rgba(0,0,0,.35);animation:tbob 2.4s ease-in-out infinite}
+  @keyframes tbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-.06em)}}
+  #title .tag{color:#c9c6e8;font:600 15px -apple-system,'Segoe UI',sans-serif;letter-spacing:.04em;margin-bottom:22px}
+  #title button{border:none;border-radius:999px;cursor:pointer;font:800 18px -apple-system,'Segoe UI',sans-serif}
+  #t-start{background:#ffd166;color:#1a1530;padding:15px 54px;box-shadow:0 6px 0 #c99a2e,0 10px 30px rgba(255,209,102,.35);animation:tpulse 1.6s ease-in-out infinite}
+  #t-start:active{transform:translateY(4px);box-shadow:0 2px 0 #c99a2e}
+  @keyframes tpulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.12)}}
+  #title .foot{position:absolute;bottom:18px;color:#6f6c90;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.1em}
   #charsel{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#2a2350ee,#0b0d1cf5);padding:12px;overflow:auto}
   .cs-card{background:#1d1838;border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:16px 16px 18px;width:100%;max-width:460px;text-align:center;color:#fff}
   .cs-title{font:800 14px ui-monospace,Menlo,monospace;letter-spacing:.12em;color:#ffd166}.cs-sub{color:#aab;font-size:12.5px;margin:4px 0 6px}
@@ -1181,6 +1192,12 @@ scramble(20);queue.push({axis:AX[0],idx:9,dir:0,dur:0,res:()=>{log.length=log.le
 loop();addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
 
 </script>
+<div id="title">
+  <h1><span class="w"><span style="color:#fff6e6;animation-delay:0.00s">M</span><span style="color:#ffcf3f;animation-delay:0.12s">A</span><span style="color:#4fcf8c;animation-delay:0.24s">G</span><span style="color:#5aa2ff;animation-delay:0.36s">I</span><span style="color:#ff6b81;animation-delay:0.48s">C</span></span><span class="w"><span style="color:#ff9a45;animation-delay:0.60s">C</span><span style="color:#fff6e6;animation-delay:0.72s">U</span><span style="color:#ffcf3f;animation-delay:0.84s">B</span><span style="color:#4fcf8c;animation-delay:0.96s">E</span></span></h1>
+  <div class="tag">26 rooms · 1 hidden core</div>
+  <button id="t-start">Start</button>
+  <div class="foot">AME294 · PROTOTYPE</div>
+</div>
 <div id="charsel">
   <div class="cs-card">
     <div class="cs-title">CHOOSE YOUR EXPLORER</div>
@@ -1251,7 +1268,7 @@ function csRender(){csButtons('cs-cols',CS_COLS,'col');csButtons('cs-eyes',CS_EY
 function csShow(){csOpen=true;document.getElementById('charsel').style.display='flex';csRender();requestAnimationFrame(csLoop)}
 document.getElementById('cs-go').onclick=()=>{try{localStorage.setItem('mc-explorer',JSON.stringify(csPick))}catch(e){}applyExplorer();csOpen=false;document.getElementById('charsel').style.display='none';csResolve()};
 document.getElementById('cs-open').onclick=()=>{if(where==='surface'&&!busy)csShow()};
-applyExplorer();csShow();
+applyExplorer();document.getElementById('t-start').onclick=()=>{document.getElementById('title').classList.add('hide');setTimeout(()=>document.getElementById('title').style.display='none',460);csShow()};
 </script>
 </body>
 </html>
