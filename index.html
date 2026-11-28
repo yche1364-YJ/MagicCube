@@ -61,7 +61,7 @@
 <div id="fade"></div>
 <a id="devlink" href="dev/">Dev</a>
 <div id="demoQuick" aria-label="Quick demo rooms">
-  <button data-room="white">Sudoku</button><button data-room="sky">Sky</button><button data-room="water">Water</button><button data-room="floor">Traversal</button><button data-room="solar">Solar</button>
+  <button data-room="white">Sudoku</button><button data-room="sky">Sky</button><button data-room="water">Water</button><button data-room="floor">Traversal</button><button data-room="solar">Solar</button><button data-room="yellow">Yellow</button><button data-room="pink">Pink</button>
 </div>
 <div id="inv"></div>
 <div id="sudokuUI"><div id="sudokuNote"></div><div id="sudokuNums"></div></div>
@@ -302,7 +302,7 @@ async function keyStep(k){if(busy||turning)return;act();const want=camDir(k);
     const has_=has(worldExits(on),w);const nb=has_?linked(on,w):null;if(!nb){bumpDir(w);return}
     busy=true;await walk([nb.st]);if(on.black)await fallInto(on);else{busy=false;arrivedSurface()}}
   else if(where==='room'&&!room.hits){const w0=V(want.x,0,want.z);const dirs=[[V(0,0,-1),-1,0],[V(0,0,1),1,0],[V(1,0,0),0,1],[V(-1,0,0),0,-1]];
-    const d=dirs.reduce((a,b)=>b[0].dot(w0)>a[0].dot(w0)?b:a);const nr=rr+d[1],nc=rc+d[2];if(nr>=0&&nr<3&&nc>=0&&nc<3)(['blueAlign','waterReveal'].includes(room.kind)?stepBlueFloor:room.kind==='solar'?solarWalkTo:tapRoomCell)(nr,nc)}}
+    const d=dirs.reduce((a,b)=>b[0].dot(w0)>a[0].dot(w0)?b:a);const nr=rr+d[1],nc=rc+d[2];if(nr>=0&&nr<3&&nc>=0&&nc<3)(['blueAlign','waterReveal'].includes(room.kind)?stepBlueFloor:room.kind==='solar'?solarWalkTo:room.kind==='yp'?ypMove:tapRoomCell)(nr,nc)}}
 async function bumpDir(w){const p0=player.position.clone();const lw=w.clone();if(player.parent!==scene){const q=new THREE.Quaternion();player.parent.getWorldQuaternion(q);lw.applyQuaternion(q.invert())}
   await tween(.22,k=>player.position.copy(p0).add(lw.clone().multiplyScalar(Math.sin(k*Math.PI)*.12)));player.position.copy(p0)}
 async function enterGoal(){if(on!==goal||busy)return;const g=goal;g.black=true;g.cover.visible=true;await fallInto(g)}
@@ -464,7 +464,7 @@ function itemOf(kind,v,owner=''){if(kind==='num')return{id:`n${v}-${owner||'free
 const PAIRS=[...[3,1,2,4].map(v=>['clock','sudoku',itemOf('num',v)]),...Object.keys(GEMC).map(v=>['lamps','gemdoor',itemOf('gem',v)]),...Object.keys(GLY).map(v=>['stroke','pedestal',itemOf('shape',v)])];
 // 6 stand-alone rooms: solve them on their own, get a power that fits the room
 const SOLO=[0,1,2].map(i=>['stroke',itemOf('pen',i)]).concat([0,1,2].map(i=>['lamps',itemOf('compass',i)]));
-const NAMES={clock:'Clock Room',sudoku:'Sudoku Room',sudoku6:'White Sudoku',sky:'Sky Alignment',water:'Water Alignment',blueHard:'Deep Blue Challenge',solar:'Solar Reflection',lamps:'Lamp Room',gemdoor:'Gem Door',stroke:'One-Stroke Room',pedestal:'Shape Pedestal'};
+const NAMES={clock:'Clock Room',sudoku:'Sudoku Room',sudoku6:'White Sudoku',sky:'Sky Alignment',water:'Water Alignment',blueHard:'Deep Blue Challenge',solar:'Solar Reflection',yellow:'Yellow Colour Room',pink:'Pink Shape Room',lamps:'Lamp Room',gemdoor:'Gem Door',stroke:'One-Stroke Room',pedestal:'Shape Pedestal'};
 let ENT=[],inv=[],tutDone=false,visitedTut=false,leaveGlow=false,activeWhite=null,whiteVisitCount=0,blueTutorialDone=false;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 // start: turn every tile's path a random way, keeping only a small patch around the traveller connected
@@ -493,8 +493,8 @@ function makeEntrances(){
     let type='sudoku6',role='white';
     if(st.face==='U'){type='sudoku6';role='white'}
     else if(st.face==='L'){type='solar';role='orange'}
-    else if(st.face==='D'){type='todo';role='yellow'}
-    else if(st.face==='R'){type='todo';role='pink'}
+    else if(st.face==='D'){type='yellow';role='yellow'}
+    else if(st.face==='R'){type='pink';role='pink'}
     else if(st.face==='F'){type='todo';role='green'}
     else if(st.face==='B'){
       if(st.center){type='blueHard';role='blue-hard'}
@@ -829,6 +829,125 @@ function solarDevSolve(){const R=room;if(!R||R.kind!=='solar'||R.done)return;con
   R.orient=sol.orientations.slice();R.pos=sol.positions.map(p=>({r:p.r,c:p.c}));
   R.mirrors.forEach((m,j)=>{const p=R.pos[j];m.g.position.copy(solarAt(p.r,p.c));m.base.position.copy(solarAt(p.r,p.c,.18));m.rig.position.copy(solarAt(p.r,p.c,0));m.g.rotation.y=R.orient[j]===0?Math.PI/4:-Math.PI/4});solarUpdate()}
 
+// ================= YELLOW (colour match) & PINK (shape) rooms =================
+// Level is chosen by trigger, not position: the Nth time you enter a colour you get its level N.
+const ypVisits={yellow:0,pink:0};
+const YP_LEVELS={
+  yellow:[{g:'paint',name:'Paint the floor'},{g:'mix',name:'Mix colours'},{g:'light',name:'Coloured light'},{g:'seq',name:'Colour sequence'},{g:'latin',name:'Restore a face'}],
+  pink:[{g:'shadow',name:'Shadow match'},{g:'push',name:'Push the pieces'},{g:'sorter',name:'Shape sorter'},{g:'stroke',name:'Walk the shape'},{g:'net',name:'Fold the net'}]};
+const YC={pink:'#ff6b81',blue:'#5aa2ff',yellow:'#ffcf3f',green:'#4fcf8c',orange:'#ff9a45',purple:'#9b6bff',brown:'#8a5a3c',red:'#e5484d',none:'#d9c7a8'};
+function ypBoard(w=2.6,h=1.3){const c=document.createElement('canvas');c.width=512;c.height=256;const tex=new THREE.CanvasTexture(c);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex}));m.position.set(0,RY+1.3,-1.5*S+.08);roomG.add(m);return{c,x:c.getContext('2d'),tex,m}}
+function boardClear(B,title){const x=B.x;x.fillStyle='#2a2420';x.fillRect(0,0,512,256);x.fillStyle='#f4e7c8';x.font='bold 26px Georgia';x.textAlign='center';x.fillText(title,256,34);return x}
+function boardGrid(x,ox,oy,s,cols){cols.forEach((row,i)=>row.forEach((v,j)=>{x.fillStyle=v||'#4a4038';x.fillRect(ox+j*s+3,oy+i*s+3,s-6,s-6)}))}
+function ypPiece(geo,col,r,c,y){const m=new THREE.Mesh(geo,std(col));m.position.copy(roomPos(r,c)).setY(RY+y);roomG.add(m);return m}
+function tileCol(r,c,col){room.sh.floor[r*3+c].material.color.set(col)}
+function buildYP(rP,cP,e){
+  if(e.ypLevel==null)e.ypLevel=Math.min(ypVisits[e.type]++,4);
+  const lv=YP_LEVELS[e.type][e.ypLevel],sh=shell(1,rP,cP,'#e9e6df',e.type==='yellow'?'#f6e7b0':'#f4d3dc');
+  sign(`${e.type==='yellow'?'Yellow':'Pink'} ${e.ypLevel+1} · ${lv.name}`).position.y=RY+2.3;
+  const R={kind:'yp',g:lv.g,name:lv.name,e,sh,rc:[rP,cP],objs:[],spawn:[2,1],step:false,blocked:[],done:!!e.solved,B:ypBoard()};room=R;
+  YP_INIT[lv.g](R);return R}
+const sameGrid=(a,b)=>a.every((row,i)=>row.every((v,j)=>v===b[i][j]));
+const YP_INIT={
+ paint(R){R.cycle=['none','pink','blue'];R.target=[[1,1,1],[0,2,0],[0,2,0]];R.state=[[0,0,0],[0,0,0],[0,0,0]];R.tip='Tap a floor tile to change its colour. Copy the picture on the wall.'},
+ mix(R){R.pads={'2,0':'red','2,2':'yellow','1,0':'blue','1,2':'wash'};R.lamps={'0,0':'orange','0,2':'green'};R.lit={};R.mine=new Set();R.tip='Stop on a paint pad to add its colour. Stop on a lamp with the same colour to light it. ⚪ washes you clean.';
+  Object.entries(R.pads).forEach(([k,v])=>{const[r,c]=k.split(',').map(Number);const p=ypPiece(new THREE.CylinderGeometry(.42,.42,.06,28),v==='wash'?'#ffffff':YC[v],r,c,.15)});
+  R.lampM={};Object.entries(R.lamps).forEach(([k,v])=>{const[r,c]=k.split(',').map(Number);ypPiece(new THREE.CylinderGeometry(.08,.08,.8,10),'#555',r,c,.5);R.lampM[k]=ypPiece(new THREE.SphereGeometry(.22,20,14),'#444',r,c,1.0);
+    const ring=ypPiece(new THREE.TorusGeometry(.36,.05,8,28),YC[v],r,c,.15);ring.rotation.x=Math.PI/2});
+  R.halo=ypPiece(new THREE.TorusGeometry(.32,.06,8,28),'#ffffff',2,1,.2);R.halo.rotation.x=Math.PI/2},
+ light(R){R.on=[0,0,0];R.btn={'2,0':[0,1],'2,2':[1,2],'0,2':[2]};R.target=[1,0,1];R.blocked=['1,1'];R.tip='Stop on a button to switch its lamps. Make the crystal glow the target colour.';
+  const L=['#e5484d','#30c060','#3e7bfa'];R.lampM=L.map((col,i)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.16,16,12),std('#444'));m.position.set((i-1)*.55,RY+2.05,0);roomG.add(m);return m});
+  Object.entries(R.btn).forEach(([k,t])=>{const[r,c]=k.split(',').map(Number);ypPiece(new THREE.CylinderGeometry(.34,.34,.08,24),'#6a6470',r,c,.16);
+    t.forEach((li,n)=>{const d=new THREE.Mesh(new THREE.SphereGeometry(.07,10,8),std(L[li]));d.position.copy(roomPos(r,c)).setY(RY+.24).add(V((n-(t.length-1)/2)*.22,0,0));roomG.add(d)})});
+  R.crystal=ypPiece(new THREE.OctahedronGeometry(.42),'#777',1,1,.7)},
+ seq(R){R.tiles={'0,0':'yellow','0,2':'green','2,0':'pink','2,2':'blue'};R.seq=['blue','yellow','green','yellow','pink'];R.prog=0;R.tip='Watch the wall, then stop on the colours in the same order. A wrong colour restarts.';R.spawn=[1,1];
+  R.flash=0;R.timer=setInterval(()=>{if(room!==R){clearInterval(R.timer);return}R.flash=(R.flash+1)%(R.seq.length+2);ypDraw()},700)},
+ latin(R){R.cols=['yellow','pink','blue'];R.state=[[0,1,2],[0,1,2],[0,1,2]];R.sel=null;R.tip='Tap two tiles to swap them. No colour may repeat in any row or column.'},
+ shadow(R){R.vox=[[0,0,0],[1,0,0],[1,1,0],[1,1,1]];R.target=ypProj(ypRot(ypRot(R.vox,'tip'),'turn'));R.blocked=['1,1'];R.tip='Tap the floating shape (or Turn / Tip) until its shadow fits the outline on the wall.';
+  R.obj=new THREE.Group();R.obj.position.set(0,RY+1.25,0);roomG.add(R.obj);ypShadowMesh()},
+ push(R){R.blocks=[[1,0],[1,2]];R.targets=[[2,0],[2,2]];R.spawn=[2,1];R.step=true;R.tip='Walk into a block to push it. Fill both outlines.';
+  R.targets.forEach(([r,c])=>{const o=ypPiece(new THREE.BoxGeometry(.9,.02,.9),'#d4537e',r,c,.13);o.material.transparent=true;o.material.opacity=.35});
+  R.blockM=R.blocks.map(([r,c])=>{const m=ypPiece(new THREE.BoxGeometry(.8,.8,.8),'#ff6b81',r,c,.52);return m})},
+ sorter(R){R.items={'2,0':'star','2,2':'triangle','1,0':'circle'};R.holes={'0,0':'triangle','0,1':'circle','0,2':'star'};R.filled={};R.hand=null;R.spawn=[2,1];R.tip='Stop on a shape to pick it up, then stop on the hole it fits.';
+  R.itemM={};Object.entries(R.items).forEach(([k,v])=>{const[r,c]=k.split(',').map(Number);R.itemM[k]=ypShape(v,'#ff6b81',r,c,.35)});
+  Object.entries(R.holes).forEach(([k,v])=>{const[r,c]=k.split(',').map(Number);const h=ypShape(v,'#2a2230',r,c,.125,.02)})},
+ stroke(R){R.target=new Set(['0,0','1,0','2,0','2,1','2,2','1,2','0,2']);R.painted=new Set();R.spawn=[0,1];R.step=true;R.tip='Each step paints a tile. Paint exactly the shape on the wall in one go — no repeats.'},
+ net(R){R.pads={'2,0':'A','2,1':'B','2,2':'C'};R.answer='B';R.spawn=[0,1];R.tip='Only one of these nets folds into a closed cube. Stop on its letter.';
+  Object.entries(R.pads).forEach(([k,v])=>{const[r,c]=k.split(',').map(Number);const m=new THREE.Mesh(new THREE.PlaneGeometry(.7,.7),new THREE.MeshBasicMaterial({map:label(v,{bg:'#fbeaf0',fg:'#993556'})}));m.rotation.x=-Math.PI/2;m.position.copy(roomPos(r,c)).setY(RY+.135);roomG.add(m)})}};
+function ypShape(kind,col,r,c,y,depth=.18){const s=new THREE.Shape(),k=.32;
+  if(kind==='circle')s.absarc(0,0,k,0,Math.PI*2);else if(kind==='triangle'){s.moveTo(0,k);s.lineTo(-k*.95,-k*.7);s.lineTo(k*.95,-k*.7)}
+  else{for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,rr_=i%2?k*.45:k;i?s.lineTo(Math.cos(a)*rr_,Math.sin(a)*rr_):s.moveTo(Math.cos(a)*rr_,Math.sin(a)*rr_)}}
+  const m=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth,bevelEnabled:false}),std(col));m.rotation.x=-Math.PI/2;m.position.copy(roomPos(r,c)).setY(RY+y);roomG.add(m);return m}
+const ypRot=(v,a)=>v.map(([x,y,z])=>a==='turn'?[z,y,-x]:[x,-z,y]);
+function ypProj(v){const p=v.map(([x,y])=>[x,y]),mx=Math.min(...p.map(q=>q[0])),my=Math.min(...p.map(q=>q[1]));return[...new Set(p.map(([x,y])=>(x-mx)+','+(y-my)))].sort().join(' ')}
+function ypShadowMesh(){const R=room;R.obj.children.slice().forEach(o=>R.obj.remove(o));const cx=R.vox.reduce((a,v)=>a+v[0],0)/4,cy=R.vox.reduce((a,v)=>a+v[1],0)/4,cz=R.vox.reduce((a,v)=>a+v[2],0)/4;
+  R.vox.forEach(([x,y,z])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(.36,.36,.36),std('#ff6b81',{emissive:0x3a0a14}));m.position.set((x-cx)*.38,(y-cy)*.38,(z-cz)*.38);m.userData.yp='shape';R.obj.add(m)});R.objs=R.obj.children.slice()}
+function ypDraw(){const R=room;if(!R||R.kind!=='yp')return;const B=R.B;let x;
+  if(R.g==='paint'){x=boardClear(B,'Copy this');boardGrid(x,196,52,62,R.target.map(r=>r.map(v=>v?YC[R.cycle[v]]:'#e9e6df')))}
+  if(R.g==='mix'){x=boardClear(B,'Light both lamps');x.font='20px Georgia';x.fillStyle='#f4e7c8';x.fillText('red + yellow = orange   ·   yellow + blue = green',256,90);
+    x.fillText('You are carrying:',220,170);x.fillStyle=YC[ypMixName(R.mine)]||'#e9e6df';x.fillRect(320,140,60,44)}
+  if(R.g==='light'){x=boardClear(B,'Make the crystal this colour');const t=R.target;x.fillStyle=`rgb(${t[0]*255},${t[1]*255},${t[2]*255})`;x.fillRect(206,70,100,100);x.font='18px Georgia';x.fillStyle='#f4e7c8';x.fillText('light adds: red + blue = magenta',256,210)}
+  if(R.g==='seq'){x=boardClear(B,'Remember the order');R.seq.forEach((c,i)=>{x.fillStyle=R.flash===i+1?YC[c]:i<R.prog?'#6b8f5a':'#4a4038';x.fillRect(66+i*80,90,64,64)});x.font='18px Georgia';x.fillStyle='#f4e7c8';x.fillText(`${R.prog} / ${R.seq.length}`,256,200)}
+  if(R.g==='latin'){x=boardClear(B,'No colour twice in a row or column');x.font='20px Georgia';x.fillStyle='#f4e7c8';x.fillText('Tap two tiles to swap',256,130)}
+  if(R.g==='shadow'){x=boardClear(B,'Fit the shadow');const draw=(set,ox,fill)=>{set.split(' ').forEach(k=>{const[a,b]=k.split(',').map(Number);if(fill){x.fillStyle='#111';x.fillRect(ox+a*44,200-b*44-40,40,40)}else{x.strokeStyle='#ffd166';x.setLineDash([6,4]);x.lineWidth=3;x.strokeRect(ox+a*44,200-b*44-40,40,40)}})};
+    x.font='16px Georgia';x.fillStyle='#f4e7c8';x.fillText('target',150,236);x.fillText('your shadow',362,236);draw(R.target,90,false);draw(ypProj(R.vox),300,true)}
+  if(R.g==='push'){x=boardClear(B,'Fill the outlines');x.font='20px Georgia';x.fillStyle='#f4e7c8';x.fillText('Walk into a block to push it',256,130)}
+  if(R.g==='sorter'){x=boardClear(B,'Every shape has a home');x.font='22px Georgia';x.fillStyle='#f4e7c8';x.fillText(R.hand?`Carrying: ${R.hand}`:'Hands empty',256,130)}
+  if(R.g==='stroke'){x=boardClear(B,'Walk this shape');boardGrid(x,196,52,62,[0,1,2].map(i=>[0,1,2].map(j=>R.target.has(i+','+j)?(R.painted.has(i+','+j)?'#ff6b81':'#111'):'#e9e6df')))}
+  if(R.g==='net'){x=boardClear(B,'Which one folds into a cube?');const nets={A:[[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]],B:[[0,0],[1,0],[1,1],[2,1],[2,2],[3,2]],C:[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1]]};
+    Object.entries(nets).forEach(([k,cells],i)=>{const ox=40+i*160;cells.forEach(([a,b])=>{x.fillStyle='#ff6b81';x.fillRect(ox+a*26,70+b*26,24,24)});x.fillStyle='#f4e7c8';x.font='bold 24px Georgia';x.fillText(k,ox+52,230)})}
+  B.tex.needsUpdate=true;ypVisual()}
+function ypMixName(s){const k=[...s].sort().join('+');return{'':'none',red:'red',yellow:'yellow',blue:'blue','red+yellow':'orange','blue+yellow':'green','blue+red':'purple','blue+red+yellow':'brown'}[k]}
+function ypVisual(){const R=room;
+  if(R.g==='paint')R.state.forEach((row,i)=>row.forEach((v,j)=>tileCol(i,j,YC[R.cycle[v]])));
+  if(R.g==='mix'){R.halo.position.copy(roomPos(rr,rc)).setY(RY+.2);R.halo.material.color.set(YC[ypMixName(R.mine)]==YC.none?'#ffffff':YC[ypMixName(R.mine)]);Object.entries(R.lampM).forEach(([k,m])=>{const on=R.lit[k];m.material.color.set(on?YC[R.lamps[k]]:'#444');m.material.emissive.set(on?YC[R.lamps[k]]:'#000')})}
+  if(R.g==='light'){R.lampM.forEach((m,i)=>{const c=['#e5484d','#30c060','#3e7bfa'][i];m.material.color.set(R.on[i]?c:'#444');m.material.emissive.set(R.on[i]?c:'#000')});const col=new THREE.Color(R.on[0]?1:.15,R.on[1]?1:.15,R.on[2]?1:.15);R.crystal.material.color.copy(col);R.crystal.material.emissive.copy(col).multiplyScalar(.5)}
+  if(R.g==='seq')Object.entries(R.tiles).forEach(([k,v])=>{const[r,c]=k.split(',').map(Number);tileCol(r,c,YC[v])});
+  if(R.g==='latin')R.state.forEach((row,i)=>row.forEach((v,j)=>{tileCol(i,j,YC[R.cols[v]]);R.sh.floor[i*3+j].position.y=RY+.06+(R.sel&&R.sel[0]===i&&R.sel[1]===j?.15:0)}));
+  if(R.g==='push')R.blocks.forEach(([r,c],i)=>R.blockM[i].position.copy(roomPos(r,c)).setY(RY+.52));
+  if(R.g==='stroke')R.painted.forEach(k=>{const[r,c]=k.split(',').map(Number);tileCol(r,c,R.target.has(k)?'#ff6b81':'#333')})}
+function ypTip(){const R=room;return R&&R.kind==='yp'?R.tip:''}
+function ypWin(msg){const R=room;if(R.done)return;R.done=true;hud();setTimeout(()=>{if(room!==R)return;toast(msg||'SOLVED!');markSolved(R.e)},500)}
+function ypCheck(){const R=room;if(R.done)return;
+  if(R.g==='paint'&&sameGrid(R.state,R.target))ypWin('PERFECT COPY!');
+  if(R.g==='light'&&R.on.every((v,i)=>v===R.target[i]))ypWin('THE CRYSTAL GLOWS!');
+  if(R.g==='latin'){const ok=[0,1,2].every(i=>new Set(R.state[i]).size===3&&new Set(R.state.map(r=>r[i])).size===3);if(ok)ypWin('FACE RESTORED!')}
+  if(R.g==='shadow'&&ypProj(R.vox)===R.target)ypWin('THE SHADOW FITS!');
+  if(R.g==='push'&&R.targets.every(([r,c])=>R.blocks.some(b=>b[0]===r&&b[1]===c)))ypWin('PIECES IN PLACE!');
+  if(R.g==='stroke'&&R.painted.size===R.target.size&&[...R.painted].every(k=>R.target.has(k)))ypWin('SHAPE DRAWN!');
+  if(R.g==='mix'&&Object.keys(R.lamps).every(k=>R.lit[k]))ypWin('BOTH LAMPS LIT!');
+  if(R.g==='seq'&&R.prog===R.seq.length)ypWin('SEQUENCE COMPLETE!');
+  if(R.g==='sorter'&&Object.keys(R.holes).every(k=>R.filled[k]))ypWin('EVERY SHAPE IS HOME!')}
+function ypArrive(){const R=room,k=rr+','+rc;if(R.done)return;
+  if(R.g==='mix'){if(R.pads[k]){R.pads[k]==='wash'?R.mine.clear():R.mine.add(R.pads[k]);toast(`You are now ${ypMixName(R.mine)==='none'?'clean':ypMixName(R.mine).toUpperCase()}`)}
+    if(R.lamps[k]&&!R.lit[k]){const want=R.lamps[k],have=ypMixName(R.mine);if(have===want){R.lit[k]=true;toast(`${want.toUpperCase()} lamp lit!`)}else toast(`This lamp needs ${want.toUpperCase()}\nYou are ${have==='none'?'clean':have}`)}}
+  if(R.g==='light'&&R.btn[k]){R.btn[k].forEach(i=>R.on[i]^=1)}
+  if(R.g==='seq'&&R.tiles[k]){if(R.tiles[k]===R.seq[R.prog]){R.prog++}else{R.prog=0;toast('Wrong colour — start again')}}
+  if(R.g==='sorter'){if(R.items[k]&&!R.hand){R.hand=R.items[k];delete R.items[k];roomG.remove(R.itemM[k]);toast(`Picked up the ${R.hand}`)}
+    else if(R.holes[k]&&R.hand&&!R.filled[k]){if(R.holes[k]===R.hand){R.filled[k]=true;ypShape(R.hand,'#ff6b81',rr,rc,.14,.04);toast(`The ${R.hand} fits!`);R.hand=null}else toast(`The ${R.hand} doesn't fit here`)}}
+  if(R.g==='net'&&R.pads[k]){if(R.pads[k]===R.answer)ypWin('IT FOLDS INTO A CUBE!');else toast(`Net ${R.pads[k]} would overlap\nwhen folded — try another`)}
+  ypDraw();ypCheck();hud()}
+async function ypMove(r,c,single){const R=room;if(busy||!R||R.kind!=='yp'||R.done)return;if(r<0||r>2||c<0||c>2||(r===rr&&c===rc))return;act();
+  if(R.g==='push'||R.g==='stroke'){if(Math.abs(r-rr)+Math.abs(c-rc)!==1){toast('One step at a time');return}
+    if(R.g==='push'){const bi=R.blocks.findIndex(b=>b[0]===r&&b[1]===c);if(bi>=0){const nr=r+(r-rr),nc=c+(c-rc);if(nr<0||nr>2||nc<0||nc>2||R.blocks.some(b=>b[0]===nr&&b[1]===nc)){toast("It won't move that way");return}R.blocks[bi]=[nr,nc]}}
+    if(R.g==='stroke'){const k=r+','+c;if(R.painted.has(k)){toast('Already painted — tap ⟲ Reset to retry');return}}
+    busy=true;await roomWalk([[r,c]]);busy=false;if(R.g==='stroke')R.painted.add(r+','+c);
+    if(R.g==='stroke'&&!R.target.has(r+','+c))toast('Off the shape!\nTap ⟲ Reset to retry');ypDraw();ypCheck();hud();return}
+  const blocked=k=>R.blocked.includes(k);if(blocked(r+','+c))return;
+  const prev=new Map([[rr+','+rc,null]]),q=[[rr,rc]];for(let i=0;i<q.length;i++){const[a,b]=q[i];for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){const ni=a+dr,nj=b+dc,key=ni+','+nj;if(ni<0||ni>2||nj<0||nj>2||blocked(key)||prev.has(key))continue;prev.set(key,[a,b]);q.push([ni,nj])}}
+  if(!prev.has(r+','+c))return;const path=[];for(let cur=[r,c];cur&&!(cur[0]===rr&&cur[1]===rc);cur=prev.get(cur.join(',')))path.unshift(cur);
+  busy=true;await roomWalk(path);busy=false;ypArrive()}
+function ypTap(obj){const R=room;if(busy||R.done){if(R.done)toast('Solved ✓ — return to the surface');return}act();
+  if(obj.userData.yp==='shape'){ypTurn('turn');return}
+  const k=R.sh.floor.indexOf(obj);if(k<0)return;const r=Math.floor(k/3),c=k%3;
+  if(R.g==='paint'){R.state[r][c]=(R.state[r][c]+1)%3;ypDraw();ypCheck();return}
+  if(R.g==='latin'){if(!R.sel){R.sel=[r,c]}else{const[a,b]=R.sel;[R.state[a][b],R.state[r][c]]=[R.state[r][c],R.state[a][b]];R.sel=null}ypDraw();ypCheck();return}
+  ypMove(r,c)}
+function ypTurn(a){const R=room;if(!R||R.g!=='shadow'||R.done||busy)return;act();R.vox=ypRot(R.vox,a);ypShadowMesh();tween(.25,k=>R.obj.scale.setScalar(1+Math.sin(k*Math.PI)*.12));ypDraw();ypCheck()}
+function ypReset(){const R=room;if(!R||R.kind!=='yp'||R.done||busy)return;act();if(R.timer)clearInterval(R.timer);const e=R.e,[a,b]=R.rc;clearRoom();room=buildYP(a,b,e);room.ent=e;[rr,rc]=room.spawn;player.position.copy(roomPos(rr,rc));ypDraw();hud()}
+function ypDevSolve(){const R=room;if(!R||R.kind!=='yp'||R.done)return;ypWin('SOLVED (dev)')}
+
 // ---------- entering / leaving ----------
 async function enterRoom(){const e=entAt(on);if(!e||busy)return;
   if(e.type==='todo'){toast(`This ${e.role} room is still being designed\nCome back later`);return}
@@ -841,12 +960,12 @@ async function enterRoom(){const e=entAt(on);if(!e||busy)return;
   const f=frame(on);const p0=player.getWorldPosition(V(0,0,0));scene.attach(player);
   await tween(.9,k=>{player.position.copy(p0).add(f.N.clone().multiplyScalar(-k*k*1.4));if(k>.5)$('fade').style.opacity=(k-.5)/.5});
   entry={st:on,a:on.cubie,ent:e};cube.visible=false;clearRoom();const pa=posOf(on.cubie);
-  const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildWaterReveal,blueHard:buildBlueAlignment,solar:buildSolar,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
+  const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildWaterReveal,blueHard:buildBlueAlignment,solar:buildSolar,yellow:buildYP,pink:buildYP,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
   room=B(pa.z+1,pa.x+1,e);room.ent=e;where='room';
-  if(room.kind==='solar'){[rr,rc]=room.spawn}else if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else if(room.kind==='blueAlign'){rr=0;rc=1}else if(room.kind==='waterReveal'){rr=2;rc=1}else{rr=2;rc=1}
-  enterRoomSpace();if(room.kind==='solar'){az=24;el=50}else if(room.kind==='blueAlign'){az=28;el=20}else if(room.kind==='waterReveal'){az=18;el=48}camSnap();await dropIn();if(room.kind==='solar')solarUpdate();if(room.kind==='waterReveal')player.position.y=RY+.18;busy=false;leaveGlow=false;hud();
+  if(room.kind==='solar'||room.kind==='yp'){[rr,rc]=room.spawn}else if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else if(room.kind==='blueAlign'){rr=0;rc=1}else if(room.kind==='waterReveal'){rr=2;rc=1}else{rr=2;rc=1}
+  enterRoomSpace();if(room.kind==='solar'){az=24;el=50}else if(room.kind==='blueAlign'){az=28;el=20}else if(room.kind==='waterReveal'){az=18;el=48}camSnap();await dropIn();if(room.kind==='solar')solarUpdate();if(room.kind==='yp')ypDraw();if(room.kind==='waterReveal')player.position.y=RY+.18;busy=false;leaveGlow=false;hud();
   if(room.kind==='sudoku6')showSudokuUI();
-  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the marker and change viewpoint.\nOnly the stars form the target.',water:'Begin on green and trace the wall path.\nA wrong block resets the pattern.',blueHard:'The deep-blue challenge is reserved for later.',solar:'Turn the mirrors so sunlight\nreaches every crystal.',lamps:'Step on the buttons\nto light all three lamps',
+  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the marker and change viewpoint.\nOnly the stars form the target.',water:'Begin on green and trace the wall path.\nA wrong block resets the pattern.',blueHard:'The deep-blue challenge is reserved for later.',solar:'Turn the mirrors so sunlight\nreaches every crystal.',yellow:`Yellow ${(e.ypLevel??0)+1} · colour match`,pink:`Pink ${(e.ypLevel??0)+1} · shape puzzle`,lamps:'Step on the buttons\nto light all three lamps',
     stroke:'Draw the shape on the wall\nin one stroke',gemdoor:'This door is missing a gem',pedestal:'Something fits in this pedestal'}[e.type];
   if(room.kind==='sudoku6'&&e.justRestored){const restored=e.justRestored;e.justRestored=null;toast(`NUMBER ${restored} RESTORED\nThe completed board is transforming`);setTimeout(()=>{if(where==='room'&&room&&room.kind==='sudoku6')checkSudoku6()},650)}
   else toast(e.solo?intro+`\nReward: ${e.item.glyph} ${e.item.name}`:intro);
@@ -933,6 +1052,7 @@ ren.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d)ret
     if(room.kind==='sudoku6'&&room.phase==='puzzle'){const h=pick(e,room.cells);if(h){const d=h.object.userData;selectSudokuCell(d.r,d.c)}}
     else if(room.kind==='sudoku6'&&room.phase==='floor'){const h=pick(e,room.cells);if(h){const d=h.object.userData;walkSudokuFloor(d.r,d.c)}}
     else if(room.kind==='solar'){const h=pick(e,[...room.mirrorHits,...room.sh.floor]);if(h)solarTap(h.object)}
+    else if(room.kind==='yp'){const h=pick(e,[...room.objs,...room.sh.floor]);if(h)ypTap(h.object)}
     else if(['blueAlign','waterReveal'].includes(room.kind)){const h=pick(e,room.sh.floor);if(h){const i=room.sh.floor.indexOf(h.object);stepBlueFloor(Math.floor(i/3),i%3)}}
     else if(room.hits){const h=pick(e,room.hits);if(h)tapRoomThing(h.object)}else{const h=pick(e,room.sh.floor);if(h){const i=room.sh.floor.indexOf(h.object);tapRoomCell(Math.floor(i/3),i%3)}}}});
 addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();toggleMode();return}const K={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'}[e.key];
@@ -950,7 +1070,7 @@ async function devOpen(kind){
   if(where==='room')await leaveRooms();
   if(where!=='surface'||busy)return;
   const white=ENT.find(e=>e.role==='white'&&!e.solved)||ENT.find(e=>e.role==='white');initWhiteEntry(white);activeWhite=white;
-  let e=white;if(kind==='solar'){e=ENT.find(x=>x.type==='solar'&&!x.solved);if(!e)return;standOn(e.st);faceCamTo(frame(e.st).N);camSnap();arrived=true;mode='explore';await enterRoom();return}
+  let e=white;if(['solar','yellow','pink'].includes(kind)){e=ENT.find(x=>x.type===kind&&!x.solved);if(!e)return;standOn(e.st);faceCamTo(frame(e.st).N);camSnap();arrived=true;mode='explore';await enterRoom();return}
   if(kind==='sky'||kind==='water'){e=ENT.find(x=>x.type===kind);blueTutorialDone=false;e.cooldown=false}
   if(!e)return;standOn(e.st);faceCamTo(frame(e.st).N);camSnap();arrived=true;mode='explore';await enterRoom();
   if(kind==='floor'&&room&&room.kind==='sudoku6'){white.externalInserted=true;white.values=white.def.solution.map(row=>row.slice());room.values=white.values;refreshSudokuMeshes();await beginSudokuFloor()}
@@ -961,7 +1081,7 @@ function hud(){let help='',stat='';const bb='style="display:inline;font-size:inh
       :`<b style="color:#7fe0a8">WALK THE SURFACE</b><i><b ${bb}>Arrow keys</b> or <b ${bb}>tap</b> a connected tile to move.<br>⚪ pit = entrance · ◼ gold = solved.</i>`;
     stat=`FACES <span style="color:#1fd6e0">${facesDone} / 6</span>`}
   else if(where==='room'){const c=entry.a,e=room.ent,nm=`<b style="color:#ffe27a">${NAMES[e.type].toUpperCase()} · ${layerName(c)} ${typeOf(c).toUpperCase()}</b>`;
-    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',sudoku6:room.phase==='floor'?(room.tutorialPair?'Start on the glowing 2, then step onto its adjacent 5.':'Cross the grid in two-step pairs totalling 7.'):room.phase==='complete'?'Door reached. This entrance is complete.':'Select blanks on the physical board. Return to the surface for locked values.',sky:'Your position changes the viewpoint; only the stars form the target.',water:'Start on green and trace the continuous wall path to gold. A wrong step resets it.',blueHard:'Reserved for the later two-number challenge.',solar:room.kind==='solar'?solarTip():'',lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
+    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',sudoku6:room.phase==='floor'?(room.tutorialPair?'Start on the glowing 2, then step onto its adjacent 5.':'Cross the grid in two-step pairs totalling 7.'):room.phase==='complete'?'Door reached. This entrance is complete.':'Select blanks on the physical board. Return to the surface for locked values.',sky:'Your position changes the viewpoint; only the stars form the target.',water:'Start on green and trace the continuous wall path to gold. A wrong step resets it.',blueHard:'Reserved for the later two-number challenge.',solar:room.kind==='solar'?solarTip():'',yellow:ypTip(),pink:ypTip(),lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
     help=nm+`<i>${room.done?'Solved ✓ — return to the surface.':tip}</i>`;stat='INSIDE THE CUBE'}
   else if(false){const c=entry.a;help=room.kind==='sudoku'?`<b style="color:#ffe27a">SUDOKU ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'Solved!':'Tap the empty square.'}</i>`:`<b style="color:#9fd0ff">CLOCK ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'You took the 3.':'Tap the number that doesn\'t belong.'}</i>`;stat='INSIDE THE CUBE'}
   else if(where==='room'){const c=room.kind==='A'?entry.a:entry.b;help=room.kind==='A'?`<b style="color:#ffe27a">${layerName(c)} LAYER · ${typeOf(c).toUpperCase()}</b><i>Arrow keys or tap the floor to walk. Light all three lamps.</i>`
@@ -970,7 +1090,8 @@ function hud(){let help='',stat='';const bb='style="display:inline;font-size:inh
   const localDev=['127.0.0.1','localhost'].includes(location.hostname);
   const quick=localDev&&where==='surface'?'<br><span style="font-size:10px;color:#8a86a8">test: <a href="#" id="devwhite">white</a> · <a href="#" id="devsky">sky</a> · <a href="#" id="devwater">water</a> · <a href="#" id="devfloor">floor</a> · <a href="#" id="devsolar">solar</a></span>':'';
   const devLinks=(!localDev?'':where==='surface'&&mode==='puzzle'?'<br><a href="#" id="dbg" style="color:#8a86a8;font-size:10px">dev: auto-solve</a>':where==='surface'&&goal?'<br><a href="#" id="dbggoal" style="color:#8a86a8;font-size:10px">dev: go to goal</a>':where==='room'&&['blueAlign','waterReveal'].includes(room.kind)&&!room.done?`<br><a href="#" id="dbgalign" style="color:#8a86a8;font-size:10px">dev: ${room.kind==='waterReveal'?'reveal targets':'align viewpoint'}</a>`:where==='room'&&room.kind==='sudoku6'&&room.phase==='puzzle'&&room.ent.externalInserted?'<br><a href="#" id="dbgfill" style="color:#8a86a8;font-size:10px">dev: fill Sudoku</a>':where==='room'&&room.kind==='sudoku6'&&room.phase==='floor'?'<br><a href="#" id="dbgroute" style="color:#8a86a8;font-size:10px">dev: walk valid route</a>':'')+quick;
-  $('help').innerHTML=help+gl;$('stat').innerHTML=stat+`<br>ENTRANCES <span style="color:#f2c14e">${ENT.filter(x=>x.solved).length} / ${ENT.length}</span>`+devLinks+(localDev&&where==='room'&&room&&room.kind==='solar'&&!room.done?'<br><a href="#" id="dbgsolar" style="color:#8a86a8;font-size:10px">dev: solve mirrors</a>':'');
+  $('help').innerHTML=help+gl;$('stat').innerHTML=stat+`<br>ENTRANCES <span style="color:#f2c14e">${ENT.filter(x=>x.solved).length} / ${ENT.length}</span>`+devLinks+(localDev&&where==='room'&&room&&room.kind==='solar'&&!room.done?'<br><a href="#" id="dbgsolar" style="color:#8a86a8;font-size:10px">dev: solve mirrors</a>':'')+(localDev&&where==='room'&&room&&room.kind==='yp'&&!room.done?'<br><a href="#" id="dbgyp" style="color:#8a86a8;font-size:10px">dev: solve room</a>':'');
+  const dbgyp=$('dbgyp');if(dbgyp)dbgyp.onclick=ev=>{ev.preventDefault();ypDevSolve()};
   const dbgsolar=$('dbgsolar');if(dbgsolar)dbgsolar.onclick=ev=>{ev.preventDefault();solarDevSolve()};
   const dbg=$('dbg');if(dbg)dbg.onclick=ev=>{ev.preventDefault();myTurns.length=0;autoSolve()};const dbggoal=$('dbggoal');if(dbggoal)dbggoal.onclick=ev=>{ev.preventDefault();if(goal){standOn(goal);faceCamTo(frame(goal).N);camSnap();arrivedSurface()}};const dbgalign=$('dbgalign');if(dbgalign)dbgalign.onclick=ev=>{ev.preventDefault();devSolveBlue()};const dbgfill=$('dbgfill');if(dbgfill)dbgfill.onclick=ev=>{ev.preventDefault();room.values=room.def.solution.map(row=>row.slice());room.ent.values=room.values;refreshSudokuMeshes();showSudokuUI();checkSudoku6()};const dbgroute=$('dbgroute');if(dbgroute)dbgroute.onclick=ev=>{ev.preventDefault();qaWalkRoute()};
   [['devwhite','white'],['devsky','sky'],['devwater','water'],['devfloor','floor'],['devsolar','solar']].forEach(([id,kind])=>{const a=$(id);if(a)a.onclick=ev=>{ev.preventDefault();devOpen(kind)}});
@@ -985,7 +1106,7 @@ function hud(){let help='',stat='';const bb='style="display:inline;font-size:inh
     [['puzzle','Rotate cube'],['explore','Walk']].forEach(([m,t])=>{const b=document.createElement('button');b.className='segb'+(mode===m?' on':'');b.innerHTML=t;b.onclick=()=>setMode(m);if(m!==mode)b.id='modeb';seg.appendChild(b)});
     if(painting)B('✕ Cancel pen',()=>{painting=false;hud()});
     else if(mode==='puzzle'){B('↶',undoTurn,'',(myTurns.length?'':'dim ')+'sq').title='Undo';B('◀',()=>{az+=90;act()},'','sq');B('▶',()=>{az-=90;act()},'','sq')}}
-  else if(where==='room'){if((room.kind==='A'||room.kind==='B')&&!room.done)B('⟲ Reset',resetRoom);if(room.kind==='solar'&&!room.done){B('⟳ Rotate mirror (R)',solarRotate,'solrot');B('⟲ Reset',solarReset)}B('Return to surface',leaveRooms,'leaveb',leaveGlow?'go3 pulse':'')}
+  else if(where==='room'){if((room.kind==='A'||room.kind==='B')&&!room.done)B('⟲ Reset',resetRoom);if(room.kind==='solar'&&!room.done){B('⟳ Rotate mirror (R)',solarRotate,'solrot');B('⟲ Reset',solarReset)}if(room.kind==='yp'&&!room.done){if(room.g==='shadow'){B('↻ Turn',()=>ypTurn('turn'),'ypturn');B('⤾ Tip',()=>ypTurn('tip'),'yptip')}B('⟲ Reset',ypReset,'ypreset')}B('Return to surface',leaveRooms,'leaveb',leaveGlow?'go3 pulse':'')}
   if(where==='surface'&&ENT.length&&ENT.every(x=>x.solved))B('◉ Enter the Core',()=>{busy=true;fade(1,.5).then(()=>{cube.visible=false;scene.attach(player);body.rotation.set(-Math.PI/2,0,0);toCore()})},'coreb','go3 pulse');
   const g=$('gest');g.textContent=where==='surface'?(painting?'Tap any tile to draw a crossroad':mode==='puzzle'?'Rotate cube: swipe row · tap path · undo available':'Walk: tap connected tile or use arrow keys · drag to look'):where==='room'?(room.hits?'Tap things in the room · Tap a bag item to use it':'Move with arrows or tap · drag to look · Return to surface exits'):'';
   // bag
