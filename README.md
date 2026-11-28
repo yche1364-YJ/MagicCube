@@ -26,8 +26,8 @@ A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. There are
 | White | 5 | 6×6 Sudoku (croth03) |
 | Blue | 5 | Sky ×2 · Water ×2 · Deep-blue centre |
 | Orange | 5 | Solar Reflection, levels 1–5 |
-| Yellow | 5 | *being designed* |
-| Pink | 5 | *being designed* |
+| Yellow | 5 | Colour match: paint · mix · light · sequence · restore a face |
+| Pink | 5 | Shape: shadow · push · sorter · walk the shape · fold the net |
 | Green | 1 (centre) | *being designed* |
 
 <img src="docs/images/entrances_26.png" width="520" alt="26 entrance positions">
@@ -72,6 +72,12 @@ Step into a registered facelet entrance to enter its puzzle space. White entranc
 - Sunlight enters the room from one wall. **Tap a gold mirror** to turn it 90°. **Blue mirrors on wheels**: tap to select → tap a glowing floor tile to move it → tap it again (or **R**) to rotate.
 - Light every crystal at the same time to solve the room. Orange rooms are independent: they need no items from other colours.
 - Levels are checked by `node scripts/validate-orange.js`.
+
+**Levels are triggered, not placed** — for orange, yellow and pink, the Nth entrance of a colour you enter is that colour's level N, wherever it is on the cube (white already works this way; blue is still position-based).
+
+**Yellow — colour match** 1 Paint the floor (tap tiles to copy the wall) · 2 Mix colours (stop on paint pads, light lamps with the matching mix) · 3 Coloured light (buttons switch red/green/blue lamps, match the crystal) · 4 Colour sequence (stop on colours in the order the wall flashes) · 5 Restore a face (swap tiles so no colour repeats in a row or column)
+
+**Pink — shape** 1 Shadow match (turn/tip a floating shape until its shadow fits) · 2 Push the pieces (sokoban into outlines) · 3 Shape sorter (carry shapes to matching holes) · 4 Walk the shape (paint the U in one stroke) · 5 Fold the net (pick the net that folds into a cube)
 
 **Legacy prototype room types**
 
