@@ -23,8 +23,8 @@ A 3×3 Rubik's cube has **54 coloured facelets**: nine of each colour. There are
 
 | Colour | Entrances | Rooms |
 |---|---|---|
-| White | 5 | 6×6 Sudoku (croth03) |
-| Blue | 5 | Sky ×2 · Water ×2 · Deep-blue centre |
+| White | 5 | 6×6 Sudoku (croth03): 5 boards, 0 → 13 blanks |
+| Blue | 5 | Sky ×2 · Water ×2 (helpers for white) · Deep-blue centre (2 stages) |
 | Orange | 5 | Solar Reflection, levels 1–5 |
 | Yellow | 5 | Colour match: paint · mix · light · sequence · restore a face |
 | Pink | 5 | Shape: shadow · push · sorter · walk the shape · fold the net |
@@ -74,6 +74,10 @@ Step into a registered facelet entrance to enter its puzzle space. White entranc
 - Levels are checked by `node scripts/validate-orange.js`.
 
 **Levels are triggered, not placed** — for orange, yellow and pink, the Nth entrance of a colour you enter is that colour's level N, wherever it is on the cube (white already works this way; blue is still position-based).
+
+**White levels 2–5** follow croth03's method: a valid 6×6 solution is chosen first, a sum-7 pair route from the entry to the door is verified, then clues are removed (4, 7, 10, 13 blanks) keeping a single solution. Each needs one number made from a sky ▲ and a water ▼ fragment. Checked by `node scripts/validate-white-levels.js`.
+
+**Blue** — sky and water rooms are reusable helpers; they turn gold once every white room is solved. The **deep-blue centre** then opens: stage 1 traces a long water path, stage 2 is a sky alignment from the corner marker (look up until the stars form ◆).
 
 **Yellow — colour match** 1 Paint the floor (tap tiles to copy the wall) · 2 Mix colours (stop on paint pads, light lamps with the matching mix) · 3 Coloured light (buttons switch red/green/blue lamps, match the crystal) · 4 Colour sequence (stop on colours in the order the wall flashes) · 5 Restore a face (swap tiles so no colour repeats in a row or column)
 

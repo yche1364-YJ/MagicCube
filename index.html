@@ -531,6 +531,7 @@ function refreshGoal(){if(where==='surface')setGoal(nextGoal())}
 function markSolved(e){e.solved=true;e.dot.clear();e.dot.userData={};const plate=new THREE.Mesh(new THREE.BoxGeometry(.17,.17,.03),new THREE.MeshStandardMaterial({color:0xffd166,emissive:0x6a4a00}));plate.position.z=.1;e.dot.add(plate);
   e.state='complete';leaveGlow=true;
   if(e===activeWhite){activeWhite=null;tutDone=true;ENT.filter(x=>x.cooldown).forEach(x=>{x.cooldown=false;x.state='unvisited'})}
+  if(e.role==='white'&&ENT.filter(x=>x.role==='white').every(x=>x.solved)){ENT.filter(x=>['sky','water'].includes(x.type)&&!x.solved).forEach(x=>{x.cooldown=false;markSolved(x)});setTimeout(()=>toast('ALL WHITE ROOMS COMPLETE\nSky and water rest · the deep blue centre is open'),1200)}
   if(ENT.every(x=>x.solved))setTimeout(()=>toast(`ALL ${ENT.length} REGISTERED ENTRANCES COMPLETE!\nThe core is open`),2400);hud()}
 function giveItem(item){inv.push(item);toast(`You got: ${item.glyph} ${item.name}\nIt's in your bag (bottom-left)`);hud();
   const el=document.querySelector(`#inv [data-id="${item.id}"]`);if(el){el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),900)}}
@@ -598,6 +599,34 @@ const WHITE_LEVELS=[{
   clues:[[1,2,3,4,5,6],[4,5,6,1,2,3],[0,3,4,5,6,1],[5,6,1,2,3,4],[3,4,5,6,1,2],[6,1,2,3,4,5]],
   controlled:[{r:2,c:0,value:2,source:'blue-tutorial'}],
   route:[[2,0],[3,0],[3,1],[3,2],[3,3],[2,3],[2,4],[2,5]],
+  pairTotal:7
+},{
+  id:'white-02',
+  solution:[[3,5,1,2,6,4],[2,4,6,3,1,5],[6,2,5,1,4,3],[1,3,4,6,5,2],[5,6,3,4,2,1],[4,1,2,5,3,6]],
+  clues:[[3,0,0,2,6,4],[2,4,6,3,1,5],[6,0,5,1,4,3],[1,3,4,6,0,2],[5,6,3,4,2,1],[4,0,2,5,3,6]],
+  controlled:[{r:5,c:1,value:1,source:'blue-pair'}],
+  route:[[2,0],[3,0],[3,1],[3,2],[4,2],[4,3],[4,4],[3,4],[3,3],[2,3],[2,4],[2,5]],
+  pairTotal:7
+},{
+  id:'white-03',
+  solution:[[6,3,5,4,1,2],[1,4,2,3,6,5],[4,5,1,2,3,6],[3,2,6,5,4,1],[2,1,3,6,5,4],[5,6,4,1,2,3]],
+  clues:[[0,3,5,4,1,0],[1,4,2,3,6,0],[0,5,1,2,0,6],[3,2,6,0,4,1],[0,1,0,6,5,4],[5,6,4,1,2,3]],
+  controlled:[{r:1,c:5,value:5,source:'blue-pair'}],
+  route:[[2,0],[3,0],[3,1],[2,1],[1,1],[0,1],[0,2],[1,2],[1,3],[0,3],[0,4],[1,4],[1,5],[0,5]],
+  pairTotal:7
+},{
+  id:'white-04',
+  solution:[[5,3,1,6,2,4],[2,4,6,1,5,3],[6,5,4,3,1,2],[1,2,3,4,6,5],[4,1,5,2,3,6],[3,6,2,5,4,1]],
+  clues:[[0,3,0,0,2,4],[0,4,6,1,0,0],[6,0,4,3,1,2],[1,2,3,4,0,0],[0,1,5,2,3,6],[0,6,2,5,4,1]],
+  controlled:[{r:4,c:0,value:4,source:'blue-pair'}],
+  route:[[2,0],[3,0],[3,1],[2,1],[2,2],[3,2],[4,2],[5,2],[5,3],[4,3],[4,4],[5,4],[5,5],[4,5]],
+  pairTotal:7
+},{
+  id:'white-05',
+  solution:[[1,5,2,4,3,6],[6,3,4,2,5,1],[3,4,1,6,2,5],[5,2,6,1,4,3],[2,6,3,5,1,4],[4,1,5,3,6,2]],
+  clues:[[1,0,2,0,3,0],[0,3,4,2,5,0],[3,0,1,6,2,5],[5,0,0,1,4,0],[2,0,3,0,1,4],[0,0,5,0,6,2]],
+  controlled:[{r:3,c:1,value:2,source:'blue-pair'}],
+  route:[[2,0],[2,1],[1,1],[1,2],[2,2],[3,2],[3,3],[2,3],[1,3],[1,4],[2,4],[2,5]],
   pairTotal:7
 }];
 const SOL6=WHITE_LEVELS[0].solution,PUZ6=WHITE_LEVELS[0].clues,FLOOR_ROUTE=WHITE_LEVELS[0].route;
@@ -676,22 +705,22 @@ async function qaWalkRoute(){if(!room||room.kind!=='sudoku6'||room.phase!=='floo
 function buildBlueAlignment(r,c,e){
   const water=e.type==='water',sh=shell(0,r,c,water?'#164d77':'#162d68',water?'#2f8ec5':'#263f86');
   if(water){sh.base.position.y=RY-1.42;sh.floor.forEach(t=>{t.position.y=RY-1.28;t.material=std('#123b61',{roughness:.75})})}
-  const tutorial=!blueTutorialDone&&activeWhite&&activeWhite.level===1,targetValue=tutorial?activeWhite.item.v:(water?'▼':'▲');sign(`${water?'WATER':'SKY'} · FIND ${targetValue}`);
+  const deep=e.type==='blueHard',tutorial=!deep&&!blueTutorialDone&&activeWhite&&activeWhite.level===1,targetValue=deep?'◆':tutorial?activeWhite.item.v:(water?'▼':'▲');sign(deep?'DEEP BLUE · STAGE 2 · SKY':`${water?'WATER':'SKY'} · FIND ${targetValue}`);
   const target=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:label(String(targetValue),{bg:'#fff6e6',fg:'#13235f',size:260})}));target.position.set(-1.15,RY+1.5,-1.5*S+.09);roomG.add(target);
-  const solution={az:0,el:water?62:-52,r:1,c:1},look=water?V(0,RY-.45,0):V(0,RY+3,0),distance=water?4.2:2.8;
-  const er=solution.el*Math.PI/180,solutionCam=look.clone().add(V(0,Math.sin(er)*distance,Math.cos(er)*distance));
-  const forward=look.clone().sub(solutionCam).normalize(),right=V(1,0,0),up=right.clone().cross(forward).normalize();
-  const glyph=tutorial?[[-.42,.6],[.05,.75],[.48,.55],[.4,.15],[.02,-.08],[-.35,-.35],[-.48,-.68],[.05,-.7],[.5,-.7]]:water?[[-.55,.65],[-.45,.2],[-.25,-.25],[0,-.62],[.25,-.25],[.45,.2],[.55,.65]]:[[0,.72],[-.2,.4],[.2,.4],[-.38,.05],[.38,.05],[-.58,-.55],[0,-.55],[.58,-.55]];
+  const solution=deep?{az:90,el:-48,r:0,c:0}:{az:0,el:water?62:-52,r:1,c:1},look=water?V(0,RY-.45,0):V(0,RY+3,0),distance=water?4.2:2.8;
+  const er=solution.el*Math.PI/180,ea=solution.az*Math.PI/180,solutionCam=look.clone().add(V(Math.sin(ea)*Math.cos(er)*distance,Math.sin(er)*distance,Math.cos(ea)*Math.cos(er)*distance));
+  const forward=look.clone().sub(solutionCam).normalize(),right=V(Math.cos(ea),0,-Math.sin(ea)),up=right.clone().cross(forward).normalize();
+  const glyph=deep?[[0,.75],[-.38,.38],[.38,.38],[-.7,0],[.7,0],[-.38,-.38],[.38,-.38],[0,-.75],[0,0]]:tutorial?[[-.42,.6],[.05,.75],[.48,.55],[.4,.15],[.02,-.08],[-.35,-.35],[-.48,-.68],[.05,-.7],[.5,-.7]]:water?[[-.55,.65],[-.45,.2],[-.25,-.25],[0,-.62],[.25,-.25],[.45,.2],[.55,.65]]:[[0,.72],[-.2,.4],[.2,.4],[-.38,.05],[.38,.05],[-.58,-.55],[0,-.55],[.58,-.55]];
   const stars=glyph.map(([x,y],i)=>{const dir=forward.clone().add(right.clone().multiplyScalar(x*.16)).add(up.clone().multiplyScalar(y*.16)).normalize(),p=solutionCam.clone().add(dir.multiplyScalar((water?3.8:1.4)+i*(water ? .18 : .17)));
     const m=new THREE.Mesh(water?new THREE.OctahedronGeometry(.09):new THREE.SphereGeometry(.075,12,8),std(water?'#63ddff':'#fff3b0',{emissive:water?0x1d7ca5:0x665010}));m.position.copy(p);roomG.add(m);return m});
   let waterPlane=null,ripple=null;if(water){waterPlane=new THREE.Mesh(new THREE.PlaneGeometry(3.45,3.45),new THREE.MeshStandardMaterial({color:0x318bc4,transparent:true,opacity:.34,roughness:.15,side:2,depthWrite:false}));waterPlane.rotation.x=-Math.PI/2;waterPlane.position.y=RY+.16;roomG.add(waterPlane);
     ripple=new THREE.Mesh(new THREE.RingGeometry(.24,.31,32),new THREE.MeshBasicMaterial({color:0xa7efff,transparent:true,opacity:.65,side:2,depthWrite:false}));ripple.rotation.x=-Math.PI/2;ripple.position.y=RY+.18;roomG.add(ripple)}
-  const marker=new THREE.Mesh(new THREE.RingGeometry(.22,.3,24),ringM(0x5ff0e0));marker.rotation.x=-Math.PI/2;marker.position.copy(roomPos(1,1)).setY(RY+.14);roomG.add(marker);
+  const marker=new THREE.Mesh(new THREE.RingGeometry(.22,.3,24),ringM(0x5ff0e0));marker.rotation.x=-Math.PI/2;marker.position.copy(roomPos(solution.r,solution.c)).setY(RY+.14);roomG.add(marker);
   return{kind:'blueAlign',variant:e.type,tutorial,sh,stars,marker,targetValue,solution,look,distance,waterPlane,ripple,alignedSince:0,done:false,hits:null}
 }
 function buildWaterReveal(r,c,e){
-  const sh=shell(0,r,c,'#164d77','#2f8ec5');sh.base.position.y=RY-1.42;sh.floor.forEach(t=>{t.position.y=RY-1.28;t.material=std('#123b61',{roughness:.75})});
-  const tutorial=!blueTutorialDone&&activeWhite&&activeWhite.level===1,targetValue=tutorial?activeWhite.item.v:'▼',targetRoute=[[2,1],[2,0],[1,0],[0,0],[0,1],[0,2]],targetCells=new Set(targetRoute.map(x=>x.join(','))),found=new Set([targetRoute[0].join(',')]),nodes=[];sign('WATER · TRACE THE WALL');
+  const sh=shell(0,r,c,e.type==='blueHard'?'#0d2a55':'#164d77',e.type==='blueHard'?'#1d4f8f':'#2f8ec5');sh.base.position.y=RY-1.42;sh.floor.forEach(t=>{t.position.y=RY-1.28;t.material=std('#123b61',{roughness:.75})});
+  const deep=e.type==='blueHard',tutorial=!deep&&!blueTutorialDone&&activeWhite&&activeWhite.level===1,targetValue=deep?'◆':tutorial?activeWhite.item.v:'▼',targetRoute=deep?[[2,1],[2,2],[1,2],[0,2],[0,1],[0,0],[1,0],[1,1]]:[[2,1],[2,0],[1,0],[0,0],[0,1],[0,2]],targetCells=new Set(targetRoute.map(x=>x.join(','))),found=new Set([targetRoute[0].join(',')]),nodes=[];sign(e.type==='blueHard'?'DEEP BLUE · STAGE 1 · WATER':'WATER · TRACE THE WALL');
   const target=new THREE.Mesh(new THREE.BoxGeometry(1.25,1.25,.05),std('#102c49'));target.position.set(0,RY+.9,-1.5*S+.1);roomG.add(target);
   for(let i=0;i<3;i++)for(let j=0;j<3;j++){const n=targetRoute.findIndex(x=>x[0]===i&&x[1]===j),color=n===0?0x65f0b4:n===targetRoute.length-1?0xffd166:n>=0?0x8feaff:0x183b5c,q=new THREE.Mesh(new THREE.PlaneGeometry(.3,.3),new THREE.MeshBasicMaterial({color}));q.position.set((j-1)*.36,RY+.9+(1-i)*.36,-1.5*S+.135);roomG.add(q)}
   for(let i=0;i<3;i++)for(let j=0;j<3;j++){const m=new THREE.Mesh(new THREE.OctahedronGeometry(.13),std('#225a80',{emissive:0x071b2b}));m.position.copy(roomPos(i,j)).setY(RY-.62);m.userData={r:i,c:j,target:targetCells.has(i+','+j)};roomG.add(m);nodes.push(m)}
@@ -719,7 +748,14 @@ function checkBlueAlignment(fromMove=false){
   if(close){if(!room.alignedSince)room.alignedSince=performance.now();if(performance.now()-room.alignedSince>350)finishBlueTutorial()}
   else{room.alignedSince=0;if(fromMove)toast(room.variant==='water'?'Float over the marker, then look down through the water':'Stand on the marker, then look up until the stars match')}
 }
+async function finishDeepBlue(){const R=room,e=R.ent;R.done=true;busy=true;const vis=R.stars||R.nodes;
+  await tween(.7,k=>vis.forEach(s=>{s.scale.setScalar(1+Math.sin(k*Math.PI)*.8);s.material.emissiveIntensity=1+k*3}));
+  if(R.kind==='waterReveal'){toast('STAGE 1 COMPLETE\nNow look up into the deep sky');await fade(1,.4);clearRoom();const pa=posOf(entry.a);room=buildBlueAlignment(pa.z+1,pa.x+1,e);room.ent=e;rr=2;rc=2;
+    player.position.copy(roomPos(rr,rc));az=28;el=20;camSnap();await fade(0,.4);busy=false;hud();return}
+  busy=false;toast('DEEP BLUE COMPLETE\nThe whole blue face is calm');markSolved(e)}
+
 async function finishBlueTutorial(){
+  if(room&&room.ent&&room.ent.type==='blueHard'&&!room.done)return finishDeepBlue();
   if(!room||!['blueAlign','waterReveal'].includes(room.kind)||room.done||!activeWhite)return;room.done=true;busy=true;const e=room.ent,item=activeWhite.item,visuals=room.stars||room.nodes;
   await tween(.7,k=>visuals.forEach(s=>{s.scale.setScalar(1+Math.sin(k*Math.PI)*.8);s.material.emissiveIntensity=1+k*3}));
   if(room.tutorial){giveItem(item);blueTutorialDone=true;activeWhite.state='number-ready';setEntranceIcon(activeWhite,String(item.v),'#c9f2d6','#1b6b3a');toast(`ALIGNMENT COMPLETE\nNumber ${item.v} belongs to White ${activeWhite.level}`)}
@@ -960,12 +996,12 @@ async function enterRoom(){const e=entAt(on);if(!e||busy)return;
   const f=frame(on);const p0=player.getWorldPosition(V(0,0,0));scene.attach(player);
   await tween(.9,k=>{player.position.copy(p0).add(f.N.clone().multiplyScalar(-k*k*1.4));if(k>.5)$('fade').style.opacity=(k-.5)/.5});
   entry={st:on,a:on.cubie,ent:e};cube.visible=false;clearRoom();const pa=posOf(on.cubie);
-  const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildWaterReveal,blueHard:buildBlueAlignment,solar:buildSolar,yellow:buildYP,pink:buildYP,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
+  const B={clock:buildClock,sudoku:buildSudoku,sudoku6:buildSudoku6,sky:buildBlueAlignment,water:buildWaterReveal,blueHard:buildWaterReveal,solar:buildSolar,yellow:buildYP,pink:buildYP,lamps:buildLamps,stroke:buildStroke,gemdoor:buildGemDoor,pedestal:buildPedestal}[e.type];
   room=B(pa.z+1,pa.x+1,e);room.ent=e;where='room';
   if(room.kind==='solar'||room.kind==='yp'){[rr,rc]=room.spawn}else if(room.kind==='A'){lampDraw();rr=1;rc=1}else if(room.kind==='B'){rr=1;rc=1}else if(room.kind==='blueAlign'){rr=0;rc=1}else if(room.kind==='waterReveal'){rr=2;rc=1}else{rr=2;rc=1}
   enterRoomSpace();if(room.kind==='solar'){az=24;el=50}else if(room.kind==='blueAlign'){az=28;el=20}else if(room.kind==='waterReveal'){az=18;el=48}camSnap();await dropIn();if(room.kind==='solar')solarUpdate();if(room.kind==='yp')ypDraw();if(room.kind==='waterReveal')player.position.y=RY+.18;busy=false;leaveGlow=false;hud();
   if(room.kind==='sudoku6')showSudokuUI();
-  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the marker and change viewpoint.\nOnly the stars form the target.',water:'Begin on green and trace the wall path.\nA wrong block resets the pattern.',blueHard:'The deep-blue challenge is reserved for later.',solar:'Turn the mirrors so sunlight\nreaches every crystal.',yellow:`Yellow ${(e.ypLevel??0)+1} · colour match`,pink:`Pink ${(e.ypLevel??0)+1} · shape puzzle`,lamps:'Step on the buttons\nto light all three lamps',
+  const intro={clock:'One numeral looks different…',sudoku:'An empty square…\nWhich number belongs here?',sudoku6:`White ${e.level}: select blank physical tiles\nand complete the 6×6 grid.`,sky:'Stand on the marker and change viewpoint.\nOnly the stars form the target.',water:'Begin on green and trace the wall path.\nA wrong block resets the pattern.',blueHard:'Deep blue, stage 1: trace the long wall path\nthrough the water.',solar:'Turn the mirrors so sunlight\nreaches every crystal.',yellow:`Yellow ${(e.ypLevel??0)+1} · colour match`,pink:`Pink ${(e.ypLevel??0)+1} · shape puzzle`,lamps:'Step on the buttons\nto light all three lamps',
     stroke:'Draw the shape on the wall\nin one stroke',gemdoor:'This door is missing a gem',pedestal:'Something fits in this pedestal'}[e.type];
   if(room.kind==='sudoku6'&&e.justRestored){const restored=e.justRestored;e.justRestored=null;toast(`NUMBER ${restored} RESTORED\nThe completed board is transforming`);setTimeout(()=>{if(where==='room'&&room&&room.kind==='sudoku6')checkSudoku6()},650)}
   else toast(e.solo?intro+`\nReward: ${e.item.glyph} ${e.item.name}`:intro);
@@ -1081,7 +1117,7 @@ function hud(){let help='',stat='';const bb='style="display:inline;font-size:inh
       :`<b style="color:#7fe0a8">WALK THE SURFACE</b><i><b ${bb}>Arrow keys</b> or <b ${bb}>tap</b> a connected tile to move.<br>⚪ pit = entrance · ◼ gold = solved.</i>`;
     stat=`FACES <span style="color:#1fd6e0">${facesDone} / 6</span>`}
   else if(where==='room'){const c=entry.a,e=room.ent,nm=`<b style="color:#ffe27a">${NAMES[e.type].toUpperCase()} · ${layerName(c)} ${typeOf(c).toUpperCase()}</b>`;
-    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',sudoku6:room.phase==='floor'?(room.tutorialPair?'Start on the glowing 2, then step onto its adjacent 5.':'Cross the grid in two-step pairs totalling 7.'):room.phase==='complete'?'Door reached. This entrance is complete.':'Select blanks on the physical board. Return to the surface for locked values.',sky:'Your position changes the viewpoint; only the stars form the target.',water:'Start on green and trace the continuous wall path to gold. A wrong step resets it.',blueHard:'Reserved for the later two-number challenge.',solar:room.kind==='solar'?solarTip():'',yellow:ypTip(),pink:ypTip(),lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
+    const tip={clock:'Tap the numeral that doesn\'t belong.',sudoku:'Work out the missing number, then tap it in your bag.',sudoku6:room.phase==='floor'?(room.tutorialPair?'Start on the glowing 2, then step onto its adjacent 5.':'Cross the grid in two-step pairs totalling 7.'):room.phase==='complete'?'Door reached. This entrance is complete.':'Select blanks on the physical board. Return to the surface for locked values.',sky:'Your position changes the viewpoint; only the stars form the target.',water:'Start on green and trace the continuous wall path to gold. A wrong step resets it.',blueHard:room.kind==='waterReveal'?'Stage 1: start on green and trace the wall path to gold.':'Stage 2: stand on the corner marker and look up until the stars form ◆.',solar:room.kind==='solar'?solarTip():'',yellow:ypTip(),pink:ypTip(),lamps:'Tap the floor to walk. Light all three lamps.',stroke:'Tap a tile next to you. Draw the wall\'s shape in one stroke.',gemdoor:'Tap the matching gem in your bag.',pedestal:'Tap the matching shape in your bag.'}[e.type];
     help=nm+`<i>${room.done?'Solved ✓ — return to the surface.':tip}</i>`;stat='INSIDE THE CUBE'}
   else if(false){const c=entry.a;help=room.kind==='sudoku'?`<b style="color:#ffe27a">SUDOKU ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'Solved!':'Tap the empty square.'}</i>`:`<b style="color:#9fd0ff">CLOCK ROOM · ${layerName(c)} ${typeOf(c).toUpperCase()}</b><i>${room.done?'You took the 3.':'Tap the number that doesn\'t belong.'}</i>`;stat='INSIDE THE CUBE'}
   else if(where==='room'){const c=room.kind==='A'?entry.a:entry.b;help=room.kind==='A'?`<b style="color:#ffe27a">${layerName(c)} LAYER · ${typeOf(c).toUpperCase()}</b><i>Arrow keys or tap the floor to walk. Light all three lamps.</i>`
